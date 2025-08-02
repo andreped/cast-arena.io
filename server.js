@@ -23,11 +23,11 @@ const burnEffects = {};
 io.on('connection', (socket) => {
     console.log('A player connected:', socket.id);
 
-    // Initialize new player
+    // Initialize new player with minimal information first
     players[socket.id] = {
         id: socket.id,
-        x: Math.random() * WORLD_WIDTH, // Random spawn position in larger world
-        y: Math.random() * WORLD_HEIGHT,
+        x: 0, // Initial position will be overwritten by respawnPlayer
+        y: 0,
         color: getRandomColor(),
         health: 100,
         maxHealth: 100,
@@ -35,28 +35,34 @@ io.on('connection', (socket) => {
         isBurning: false,
         burnEndTime: 0,
         isAlive: true,
-        spawnProtection: true,
-        spawnTime: Date.now(),
         facingLeft: false
     };
 
-    // Send current players to new player
+    // Send current players to new player first
     socket.emit('currentPlayers', players);
 
     // Notify other players about new player
     socket.broadcast.emit('newPlayer', players[socket.id]);
     
-    // Remove spawn protection after 2 seconds
-    setTimeout(() => {
-        if (players[socket.id]) {
-            players[socket.id].spawnProtection = false;
-            io.emit('spawnProtectionEnded', { id: socket.id });
-        }
-    }, 2000);
+    // Use the unified respawn function for initializing the player position
+    // This ensures complete consistency between initial spawn and respawn
+    respawnPlayer(socket.id);
 
     // Handle player movement
     socket.on('playerMovement', (movementData) => {
         if (players[socket.id]) {
+            // Ignore movement updates if player is in respawn immunity period
+            if (players[socket.id].respawnImmunity) {
+                console.log('Ignoring movement during respawn immunity');
+                return;
+            }
+            
+            // Ignore movement if player is dead
+            if (players[socket.id].isAlive !== true) {
+                console.log('Ignoring movement for dead player:', socket.id);
+                return;
+            }
+            
             players[socket.id].x = movementData.x;
             players[socket.id].y = movementData.y;
             
@@ -65,12 +71,13 @@ io.on('connection', (socket) => {
                 players[socket.id].facingLeft = movementData.facingLeft;
             }
             
-            // Broadcast movement to other players
+            // Broadcast movement to other players including isAlive state
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
                 x: movementData.x,
                 y: movementData.y,
-                facingLeft: players[socket.id].facingLeft
+                facingLeft: players[socket.id].facingLeft,
+                isAlive: players[socket.id].isAlive
             });
         }
     });
@@ -107,9 +114,17 @@ io.on('connection', (socket) => {
         const target = players[targetId];
         const caster = players[spell?.casterId];
         
+        // Validate all entities exist and this isn't friendly fire
         if (spell && target && caster && targetId !== spell.casterId) {
             // Skip if player has spawn protection
             if (target.spawnProtection) {
+                console.log(`Ignoring hit on player ${targetId} with spawn protection`);
+                return;
+            }
+            
+            // Skip if player is already dead - strictly check isAlive flag
+            if (target.isAlive !== true) {
+                console.log(`Ignoring hit on dead player ${targetId}`);
                 return;
             }
             
@@ -125,45 +140,30 @@ io.on('connection', (socket) => {
             };
             
             // Check if player died
-            if (target.health <= 0) {
+            if (target.health <= 0 && target.isAlive) { // Only process death if player is alive
                 target.health = 0;
                 target.isAlive = false;
-                caster.kills++;
+                
+                // Increment the killer's kill count
+                caster.kills = (caster.kills || 0) + 1;
+                console.log(`Player ${spell.casterId} killed player ${targetId}. Kills: ${caster.kills}`);
                 
                 // Notify player of death
                 io.to(targetId).emit('playerDied');
                 
+                // Notify all clients that this player is dead
+                io.emit('playerStateUpdate', {
+                    id: targetId,
+                    isAlive: false,
+                    health: 0
+                });
+                
                 // Respawn after 3 seconds
                 setTimeout(() => {
-                    if (players[targetId]) {
-                        players[targetId].health = 100;
-                        players[targetId].x = Math.random() * WORLD_WIDTH;
-                        players[targetId].y = Math.random() * WORLD_HEIGHT;
-                        players[targetId].isBurning = false;
-                        players[targetId].isAlive = true;
-                        players[targetId].kills = 0; // Reset kills on death
-                        players[targetId].spawnProtection = true;
-                        players[targetId].spawnTime = Date.now();
-                        delete burnEffects[targetId];
-                        
-                        // Remove spawn protection after 2 seconds
-                        setTimeout(() => {
-                            if (players[targetId]) {
-                                players[targetId].spawnProtection = false;
-                                io.emit('spawnProtectionEnded', { id: targetId });
-                            }
-                        }, 2000);
-                        
-                        io.emit('playerRespawned', {
-                            id: targetId,
-                            x: players[targetId].x,
-                            y: players[targetId].y,
-                            health: players[targetId].health,
-                            kills: players[targetId].kills
-                        });
-                    }
+                    respawnPlayer(targetId);
                 }, 3000);
                 
+                // Broadcast the kill information
                 io.emit('playerKilled', {
                     killerId: spell.casterId,
                     victimId: targetId,
@@ -202,6 +202,14 @@ setInterval(() => {
         const player = players[playerId];
         
         if (player && burnEffect) {
+            // First, check if player is alive - if not, immediately clear burn effect
+            if (player.isAlive !== true) {
+                player.isBurning = false;
+                delete burnEffects[playerId];
+                io.emit('burnEnded', { id: playerId });
+                return;
+            }
+            
             // Check if burn effect should end
             if (now >= burnEffect.endTime) {
                 player.isBurning = false;
@@ -211,44 +219,43 @@ setInterval(() => {
             } else {
                 // Apply burn damage every second
                 if (now - burnEffect.lastTick >= 1000) {
-                    player.health = Math.max(0, player.health - 2);
-                    burnEffect.lastTick = now;
-                    
-                    // Check if player died from burn
-                    if (player.health <= 0) {
-                        player.health = 0;
+                    // Double-check player is alive (belt and suspenders approach)
+                    if (player.isAlive === true) {
+                        player.health = Math.max(0, player.health - 2);
+                        burnEffect.lastTick = now;
+                    } else {
+                        // If player is dead, remove the burn effect
                         player.isBurning = false;
                         delete burnEffects[playerId];
+                        io.emit('burnEnded', { id: playerId });
+                        return;
+                    }
+                    
+                    // Check if player died from burn
+                    if (player.health <= 0 && player.isAlive) { // Only process death if player is alive
+                        player.health = 0;
+                        player.isBurning = false;
+                        player.isAlive = false; // Mark as dead
+                        delete burnEffects[playerId];
+                        
+                        console.log(`Player ${playerId} died from burn damage`);
+                        
+                        // Notify player of death
+                        io.to(playerId).emit('playerDied');
                         
                         // Respawn after 3 seconds
                         setTimeout(() => {
-                            if (players[playerId]) {
-                                players[playerId].health = 100;
-                                players[playerId].x = Math.random() * WORLD_WIDTH;
-                                players[playerId].y = Math.random() * WORLD_HEIGHT;
-                                players[playerId].kills = 0;
-                                players[playerId].spawnProtection = true;
-                                players[playerId].spawnTime = Date.now();
-                                
-                                // Remove spawn protection after 2 seconds
-                                setTimeout(() => {
-                                    if (players[playerId]) {
-                                        players[playerId].spawnProtection = false;
-                                        io.emit('spawnProtectionEnded', { id: playerId });
-                                    }
-                                }, 2000);
-                                
-                                io.emit('playerRespawned', {
-                                    id: playerId,
-                                    x: players[playerId].x,
-                                    y: players[playerId].y,
-                                    health: players[playerId].health,
-                                    kills: players[playerId].kills
-                                });
-                            }
+                            respawnPlayer(playerId);
                         }, 3000);
                         
                         io.emit('playerDiedFromBurn', { id: playerId });
+                        
+                        // Also broadcast explicit death state to all clients
+                        io.emit('playerStateUpdate', {
+                            id: playerId,
+                            isAlive: false,
+                            health: 0
+                        });
                     } else {
                         io.emit('healthUpdate', {
                             id: playerId,
@@ -267,6 +274,120 @@ setInterval(() => {
 function getRandomColor() {
     const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'];
     return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// Helper function to respawn a player with consistent logic
+function respawnPlayer(playerId) {
+    if (players[playerId]) {
+        console.log('Respawning player:', playerId);
+        
+        // Generate new spawn coordinates
+        const spawnX = Math.random() * WORLD_WIDTH;
+        const spawnY = Math.random() * WORLD_HEIGHT;
+        
+        // Stop processing any movement updates during respawn
+        players[playerId].respawnImmunity = true;
+        
+        // Reset ALL player stats for respawn to ensure clean state
+        players[playerId].health = 100;
+        players[playerId].x = spawnX;
+        players[playerId].y = spawnY;
+        players[playerId].isBurning = false;
+        players[playerId].isAlive = true; // Explicitly set to alive
+        players[playerId].burnEndTime = 0; // Clear burn end time
+        
+        // Don't reset kills on initial spawn, only when player dies
+        if (players[playerId].hasSpawned) {
+            players[playerId].kills = 0;
+        } else {
+            // Mark that this player has spawned at least once
+            players[playerId].hasSpawned = true;
+        }
+        players[playerId].spawnProtection = true;
+        players[playerId].spawnTime = Date.now();
+        
+        // Make sure to clear any burn effects
+        delete burnEffects[playerId];
+        
+        // Notify all clients about the respawn with a playerStateUpdate to ensure isAlive is synced
+        io.emit('playerStateUpdate', {
+            id: playerId,
+            isAlive: true,
+            health: players[playerId].health
+        });
+        
+        // First notify the specific player about their respawn with isLocalPlayer flag
+        io.to(playerId).emit('playerRespawned', {
+            id: playerId,
+            x: spawnX,
+            y: spawnY,
+            health: players[playerId].health,
+            kills: players[playerId].kills,
+            isAlive: true, 
+            isLocalPlayer: true // Flag to identify this is the local player respawning
+        });
+        
+        // Then broadcast to ALL other players that this player has respawned
+        // Making sure we have the socket for this player
+        const playerSocket = io.sockets.sockets.get(playerId);
+        if (playerSocket) {
+            playerSocket.broadcast.emit('playerRespawned', {
+                id: playerId,
+                x: spawnX,
+                y: spawnY,
+                health: players[playerId].health,
+                kills: players[playerId].kills,
+                isAlive: true,
+                isLocalPlayer: false // Flag indicating this is NOT the local player
+            });
+        } else {
+            // Fallback to general broadcast if we can't get the socket directly
+            io.emit('playerRespawned', {
+                id: playerId,
+                x: spawnX,
+                y: spawnY,
+                health: players[playerId].health,
+                kills: players[playerId].kills,
+                isAlive: true,
+                isLocalPlayer: false
+            });
+        }
+        
+        // Send an additional "forceSyncPlayer" event to ensure all clients update this player's state
+        io.emit('forceSyncPlayer', {
+            id: playerId,
+            x: spawnX,
+            y: spawnY,
+            health: players[playerId].health,
+            isAlive: true,
+            isBurning: false,
+            burnEndTime: 0,
+            kills: players[playerId].kills
+        });
+        
+        // Also broadcast a health update to ensure all clients clear burn effects and health state
+        io.emit('healthUpdate', {
+            id: playerId,
+            health: players[playerId].health,
+            isBurning: false,
+            burnEndTime: 0
+        });
+        
+        // Remove respawn immunity after a delay to allow client to stabilize
+        setTimeout(() => {
+            if (players[playerId]) {
+                players[playerId].respawnImmunity = false;
+            }
+        }, 1000);
+        
+        // Remove spawn protection after 2 seconds
+        setTimeout(() => {
+            if (players[playerId]) {
+                players[playerId].spawnProtection = false;
+                io.emit('spawnProtectionEnded', { id: playerId });
+            }
+        }, 2000);
+    }
 }
 
 const PORT = process.env.PORT || 3000;

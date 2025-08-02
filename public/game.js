@@ -58,6 +58,9 @@ socket.on('connect', () => {
     console.log('Connected to server with ID:', myId);
 });
 
+// We no longer need a separate setInitialPosition event
+// Initial position is now set through playerRespawned event for consistency
+
 socket.on('spawnProtectionEnded', (data) => {
     if (players[data.id]) {
         players[data.id].spawnProtection = false;
@@ -81,12 +84,66 @@ socket.on('playerMoved', (data) => {
         if (data.facingLeft !== undefined) {
             players[data.id].facingLeft = data.facingLeft;
         }
+        // If the server sends isAlive state with movement, update that too
+        if (data.isAlive !== undefined) {
+            const wasAlive = players[data.id].isAlive;
+            if (wasAlive !== data.isAlive) {
+                console.log(`Player ${data.id} alive state changed during movement: ${wasAlive} -> ${data.isAlive}`);
+                players[data.id].isAlive = data.isAlive;
+            }
+        }
+    }
+});
+
+socket.on('playerPositionUpdate', (data) => {
+    if (players[data.id]) {
+        // Only update other players' positions this way, not the local player
+        // This prevents position conflicts with local movement prediction
+        if (data.id !== myId) {
+            players[data.id].x = data.x;
+            players[data.id].y = data.y;
+        }
+    }
+});
+
+// Force sync a player's full state - use this to ensure consistent state across clients
+socket.on('forceSyncPlayer', (data) => {
+    if (players[data.id]) {
+        console.log(`Force syncing player ${data.id} state:`, data);
+        // Update all properties provided by the server
+        Object.keys(data).forEach(key => {
+            if (key !== 'id') { // Skip the id since we use it as the object key
+                players[data.id][key] = data[key];
+            }
+        });
+        
+        // Debug logging for important state changes
+        console.log(`Player ${data.id} after force sync: isAlive=${players[data.id].isAlive}, health=${players[data.id].health}`);
     }
 });
 
 socket.on('playerDisconnected', (playerId) => {
     delete players[playerId];
     updatePlayerCount();
+});
+
+// Player state update handling
+socket.on('playerStateUpdate', (data) => {
+    if (players[data.id]) {
+        // Update player's alive state and health
+        const wasAlive = players[data.id].isAlive;
+        players[data.id].isAlive = data.isAlive;
+        players[data.id].health = data.health;
+        
+        console.log(`Player ${data.id} state update: isAlive ${wasAlive} -> ${data.isAlive}, health: ${data.health}`);
+        
+        // If a player is transitioning from dead to alive, make sure to clear any effects
+        if (!wasAlive && data.isAlive === true) {
+            players[data.id].isBurning = false;
+            players[data.id].burnEndTime = 0;
+            console.log(`Player ${data.id} resurrected from dead to alive state`);
+        }
+    }
 });
 
 // Combat events
@@ -96,9 +153,14 @@ socket.on('spellCast', (spell) => {
 
 socket.on('healthUpdate', (data) => {
     if (players[data.id]) {
+        const prevHealth = players[data.id].health;
+        const prevBurning = players[data.id].isBurning;
+        
         players[data.id].health = data.health;
         players[data.id].isBurning = data.isBurning;
         players[data.id].burnEndTime = data.burnEndTime;
+        
+        console.log(`Health update for player ${data.id}: health ${prevHealth} -> ${data.health}, burning ${prevBurning} -> ${data.isBurning}`);
     }
 });
 
@@ -110,11 +172,56 @@ socket.on('playerKilled', (data) => {
 
 socket.on('playerRespawned', (data) => {
     if (players[data.id]) {
+        console.log('Player spawned/respawned:', data.id, 'at position:', data.x, data.y);
+        
+        // Update player properties with server data
         players[data.id].x = data.x;
         players[data.id].y = data.y;
         players[data.id].health = data.health;
         players[data.id].kills = data.kills;
+        
+        // IMPORTANT: Reset all effects and state completely
         players[data.id].isBurning = false;
+        players[data.id].burnEndTime = 0;
+        players[data.id].isAlive = true; // Explicitly mark player as alive
+        players[data.id].spawnProtection = true;
+        players[data.id].isRespawning = true; // Flag to prevent movement for a short time
+        
+        // If this is the current player, handle spawn/respawn
+        if (data.id === myId) {
+            // Clear any movement input state
+            Object.keys(keys).forEach(key => {
+                keys[key] = false;
+            });
+            
+            // Reset joystick if on mobile
+            if (isMobile) {
+                joystickActive = false;
+                joystickDirection = { x: 0, y: 0 };
+            }
+            
+            // Set isDead to false - works for both initial spawn and respawn
+            isDead = false;
+            
+            // Immediately update camera position without smoothing
+            updateCamera(true);
+            
+            // Hide death modal if it's showing (only relevant for respawn)
+            const deathModal = document.getElementById('deathModal');
+            if (deathModal.style.display === 'block') {
+                deathModal.style.display = 'none';
+            }
+            
+            console.log('Player fully respawned with isAlive =', players[myId].isAlive);
+            
+            // Allow movement again after a delay
+            setTimeout(() => {
+                if (players[myId]) {
+                    console.log('Movement enabled for player:', myId);
+                    players[myId].isRespawning = false;
+                }
+            }, 1000); // 1 second delay before allowing movement
+        }
     }
 });
 
@@ -126,7 +233,20 @@ socket.on('burnEnded', (data) => {
 
 socket.on('playerDied', () => {
     isDead = true;
+    
+    // Mark player as dead in local state
+    if (myId && players[myId]) {
+        console.log('Player died, setting isAlive to false');
+        players[myId].isAlive = false;
+        players[myId].health = 0;
+    }
+    
     showDeathModal();
+    
+    // Disable all key inputs to prevent movement while dead
+    Object.keys(keys).forEach(key => {
+        keys[key] = false;
+    });
 });
 
 // Input handling
@@ -146,8 +266,18 @@ document.addEventListener('keydown', (e) => {
     // Cast spell with space
     if (e.key === ' ') {
         e.preventDefault();
-        // Cast towards center of viewport in world coordinates
-        castSpell(cameraX + canvas.width / 2, cameraY + canvas.height / 2);
+        
+        if (!myId || !players[myId] || isDead) return;
+        
+        // Cast in the direction player is facing
+        const player = players[myId];
+        const direction = player.facingLeft ? -1 : 1;
+        
+        // Cast toward a point in front of the player
+        const targetX = player.x + direction * WORLD_WIDTH/2; // Half the world width in facing direction
+        const targetY = player.y; // Same height as player
+        
+        castSpell(targetX, targetY);
     }
 });
 
@@ -160,17 +290,30 @@ document.addEventListener('keyup', (e) => {
 // Mouse handling for spell casting
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    // Convert to world coordinates by adding camera position
-    mouseX = e.clientX - rect.left + cameraX;
-    mouseY = e.clientY - rect.top + cameraY;
+    // Convert screen coordinates to viewport coordinates
+    const viewportX = e.clientX - rect.left;
+    const viewportY = e.clientY - rect.top;
+    
+    // Convert viewport coordinates to world coordinates by adding camera position
+    mouseX = viewportX + cameraX;
+    mouseY = viewportY + cameraY;
 });
 
 canvas.addEventListener('click', (e) => {
+    if (!myId || !players[myId] || isDead) return;
+    
     const rect = canvas.getBoundingClientRect();
-    // Convert to world coordinates by adding camera position
-    const targetX = e.clientX - rect.left + cameraX;
-    const targetY = e.clientY - rect.top + cameraY;
-    castSpell(targetX, targetY);
+    
+    // Convert screen coordinates to viewport coordinates
+    const viewportX = e.clientX - rect.left;
+    const viewportY = e.clientY - rect.top;
+    
+    // Convert viewport coordinates to world coordinates by adding camera position
+    const worldX = viewportX + cameraX;
+    const worldY = viewportY + cameraY;
+    
+    console.log('Casting spell from', players[myId].x, players[myId].y, 'to', worldX, worldY);
+    castSpell(worldX, worldY);
 });
 
 // Mobile touch controls
@@ -256,14 +399,20 @@ function fireInDirection() {
     let targetX, targetY;
     
     if (Math.abs(joystickDirection.x) > 0.1 || Math.abs(joystickDirection.y) > 0.1) {
-        // Fire in joystick direction - use world dimensions for better range
-        const maxDistance = Math.max(WORLD_WIDTH, WORLD_HEIGHT);
-        targetX = player.x + joystickDirection.x * maxDistance;
-        targetY = player.y + joystickDirection.y * maxDistance;
+        // Fire in joystick direction
+        console.log('Firing in joystick direction:', joystickDirection.x, joystickDirection.y);
+        
+        // Calculate a point in the joystick direction from the player's position
+        // We use a large distance so the spell travels far enough
+        const diagonalDistance = Math.sqrt(WORLD_WIDTH*WORLD_WIDTH + WORLD_HEIGHT*WORLD_HEIGHT);
+        targetX = player.x + joystickDirection.x * diagonalDistance;
+        targetY = player.y + joystickDirection.y * diagonalDistance;
     } else {
         // Fire in direction player is facing
         const direction = player.facingLeft ? -1 : 1;
-        targetX = player.x + direction * WORLD_WIDTH;
+        console.log('Firing in facing direction:', direction);
+        
+        targetX = player.x + direction * WORLD_WIDTH/2; // Half world width in facing direction
         targetY = player.y;
     }
     
@@ -271,6 +420,7 @@ function fireInDirection() {
     targetX = Math.max(0, Math.min(WORLD_WIDTH, targetX));
     targetY = Math.max(0, Math.min(WORLD_HEIGHT, targetY));
     
+    console.log('Mobile fire from', player.x, player.y, 'to', targetX, targetY);
     castSpell(targetX, targetY);
 }
 
@@ -290,6 +440,13 @@ function handleMovement() {
     if (!myId || !players[myId]) return;
 
     const player = players[myId];
+    
+    // Don't allow movement during respawn transition or death
+    if (isDead || player.isRespawning) {
+        // Don't process any movement
+        return;
+    }
+    
     let moved = false;
     
     let newX = player.x;
@@ -383,8 +540,18 @@ function render() {
     Object.values(players).forEach(player => {
         // Only draw players that are visible in the viewport
         if (isInViewport(player.x, player.y)) {
+            // Debug check for player state - only log occasionally to avoid console spam
+            if (player.id === myId && Math.random() < 0.01) { // Only log ~1% of frames
+                console.log(`Rendering player ${player.id}: isAlive=${player.isAlive}, health=${player.health}`);
+            }
+            
+            // Always draw the player (will be drawn as ghost if isAlive is false)
             drawPlayer(player, player.id === myId);
-            drawHealthBar(player);
+            
+            // Only draw health bar for living players - strictly check isAlive
+            if (player.isAlive === true) {
+                drawHealthBar(player);
+            }
         }
     });
     
@@ -423,13 +590,18 @@ function drawPlayer(player, isMe) {
     const x = player.x;
     const y = player.y;
     const facingLeft = player.facingLeft;
-    const isDead = player.health <= 0;
+    // Explicitly check isAlive status - if isAlive is true, the player is alive regardless of health
+    // Add occasional logging for debugging player state
+    const isDead = player.isAlive === false;
+    if (isMe && player.id === myId && Math.random() < 0.01) { // Only log ~1% of frames
+        console.log(`Drawing local player: id=${player.id}, isAlive=${player.isAlive}, isDead=${isDead}`);
+    }
     
     // Save context to restore later
     ctx.save();
     
-    // Spawn protection effect
-    if (player.spawnProtection) {
+    // Spawn protection effect - only show for living players
+    if (player.spawnProtection && !isDead) {
         const time = Date.now();
         const pulse = Math.sin(time * 0.01) * 0.3 + 0.7;
         
@@ -447,8 +619,8 @@ function drawPlayer(player, isMe) {
         ctx.fill();
     }
     
-    // Draw burning effect
-    if (player.isBurning) {
+    // Draw burning effect - only show for living players
+    if (player.isBurning && !isDead) {
         const time = Date.now();
         const flicker = Math.sin(time * 0.01) * 0.3 + 0.7;
         
@@ -590,6 +762,11 @@ function drawPlayer(player, isMe) {
 }
 
 function drawHealthBar(player) {
+    // Don't draw health bar for dead players - only check isAlive flag
+    if (player.isAlive === false) {
+        return;
+    }
+    
     const x = player.x;
     const y = player.y - PLAYER_SIZE - 20;
     const width = 40;
@@ -637,19 +814,22 @@ function castSpell(targetX, targetY) {
     
     const player = players[myId];
     
-    // Calculate direction vector
+    // Calculate direction vector from player to target in world coordinates
     const dx = targetX - player.x;
     const dy = targetY - player.y;
     const length = Math.sqrt(dx * dx + dy * dy);
     
     if (length === 0) return; // Prevent division by zero
     
-    // Normalize direction and extend to screen width
+    console.log('Spell direction:', dx, dy, 'length:', length);
+    
+    // Normalize direction vector
     const normalizedDx = dx / length;
     const normalizedDy = dy / length;
     
-    // Calculate target point with much longer distance for the larger world
-    const maxTravelDistance = Math.max(WORLD_WIDTH, WORLD_HEIGHT); // Travel up to the full world size
+    // Calculate target point with much longer distance
+    // We'll set the distance to diagonal of the world for maximum range
+    const maxTravelDistance = Math.sqrt(WORLD_WIDTH*WORLD_WIDTH + WORLD_HEIGHT*WORLD_HEIGHT);
     let finalTargetX = player.x + normalizedDx * maxTravelDistance;
     let finalTargetY = player.y + normalizedDy * maxTravelDistance;
     
@@ -668,6 +848,7 @@ function castSpell(targetX, targetY) {
         });
     }
     
+    // Send spell cast event to server
     socket.emit('castSpell', {
         x: player.x,
         y: player.y,
@@ -744,17 +925,21 @@ function updateSpell(spell) {
     
     // Check collision with players
     Object.values(players).forEach(player => {
-        if (player.id !== spell.casterId) {
+        // Skip caster and explicitly check isAlive status
+        // A player is only alive if isAlive is exactly true
+        if (player.id !== spell.casterId && player.isAlive === true) {
             const playerDx = player.x - spell.x;
             const playerDy = player.y - spell.y;
             const playerDistance = Math.sqrt(playerDx * playerDx + playerDy * playerDy);
             
             if (playerDistance < PLAYER_SIZE + SPELL_SIZE) {
-                // Hit detected
+                // Register hit on this living player
                 socket.emit('spellHit', {
                     spellId: spell.id,
                     targetId: player.id
                 });
+                
+                // Remove the spell when it hits any player
                 delete spells[spell.id];
             }
         }
@@ -813,6 +998,7 @@ function updateSpells() {
         
         // Check collision with players
         Object.values(players).forEach(player => {
+            // Only process hits on living players that aren't the caster
             if (player.id !== spell.casterId && player.isAlive !== false) {
                 const playerDx = player.x - spell.x;
                 const playerDy = player.y - spell.y;
@@ -826,6 +1012,9 @@ function updateSpells() {
                     });
                     delete spells[spell.id];
                 }
+            } else if (player.id !== spell.casterId && player.isAlive === false) {
+                // If player is dead, log this but don't process any hit
+                console.log('Spell passed through dead player:', player.id);
             }
         });
         
@@ -920,7 +1109,8 @@ function showDeathModal() {
         } else {
             clearInterval(countdown);
             deathModal.style.display = 'none';
-            isDead = false;
+            // isDead is now set to false when the playerRespawned event is received
+            // This ensures we don't restore control to the player until the server confirms respawn
         }
     }, 1000);
 }
@@ -961,7 +1151,7 @@ function updatePlayerCount() {
     document.getElementById('playerCount').textContent = `Players Online: ${count}`;
 }
 
-function updateCamera() {
+function updateCamera(immediate = false) {
     if (myId && players[myId]) {
         // Calculate camera position to center on player
         const player = players[myId];
@@ -970,9 +1160,15 @@ function updateCamera() {
         const targetX = player.x - CANVAS_WIDTH / 2;
         const targetY = player.y - CANVAS_HEIGHT / 2;
         
-        // Apply some smoothing (lerp) for camera movement
-        cameraX += (targetX - cameraX) * 0.1;
-        cameraY += (targetY - cameraY) * 0.1;
+        if (immediate) {
+            // Set camera position immediately (no smoothing)
+            cameraX = targetX;
+            cameraY = targetY;
+        } else {
+            // Apply some smoothing (lerp) for camera movement
+            cameraX += (targetX - cameraX) * 0.1;
+            cameraY += (targetY - cameraY) * 0.1;
+        }
         
         // Clamp camera to world boundaries
         cameraX = Math.max(0, Math.min(cameraX, WORLD_WIDTH - CANVAS_WIDTH));

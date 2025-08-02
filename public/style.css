@@ -279,3 +279,10 @@ h1 {
         right: 5px;
     }
 }
+
+.respawn-note {
+    font-size: 0.9em;
+    color: #b3e5fc;
+    margin-top: 10px;
+    font-style: italic;
+}
