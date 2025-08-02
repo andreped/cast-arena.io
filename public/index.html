@@ -11,12 +11,48 @@
         <h1>🧙‍♂️ Cast Arena</h1>
         <div id="gameInfo">
             <span id="playerCount">Players Online: 0</span>
-            <span id="instructions">Use WASD or Arrow Keys to move</span>
+            <span id="instructions">Use WASD to move, Click/Space to cast fireball, ESC for leaderboard</span>
         </div>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="gameArea">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div id="minimap">
+                <canvas id="minimapCanvas" width="120" height="90"></canvas>
+                <div id="minimapTitle">Minimap</div>
+            </div>
+        </div>
         <div id="controls">
-            <p>Move: WASD or Arrow Keys</p>
-            <p>More spells coming soon! 🔥⚡🧊</p>
+            <p>Desktop: WASD to move, Click/Space to cast | Mobile: Use touch controls</p>
+            <p>🔥 Fireball: 20 damage + 2 damage/sec for 10 seconds</p>
+        </div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobileControls">
+        <div id="joystickContainer">
+            <div id="joystickArea">
+                <div id="joystick"></div>
+            </div>
+            <div id="joystickLabel">Move</div>
+        </div>
+        <div id="fireButtonContainer">
+            <button id="fireButton">🔥<br>FIRE</button>
+        </div>
+    </div>
+
+    <!-- Death Modal -->
+    <div id="deathModal" class="modal">
+        <div class="modal-content death-modal">
+            <h2>💀 You Died!</h2>
+            <p>Respawning in <span id="respawnTimer">3</span> seconds...</p>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboardModal" class="modal">
+        <div class="modal-content">
+            <h2>🏆 Leaderboard</h2>
+            <div id="leaderboardList"></div>
+            <p class="modal-close-hint">Press ESC to close</p>
         </div>
     </div>
 
