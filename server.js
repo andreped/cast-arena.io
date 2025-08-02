@@ -7,6 +7,10 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// Game world configuration
+const WORLD_WIDTH = 800 * 3;  // Triple the canvas size
+const WORLD_HEIGHT = 600 * 3;
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -22,8 +26,8 @@ io.on('connection', (socket) => {
     // Initialize new player
     players[socket.id] = {
         id: socket.id,
-        x: Math.random() * 800, // Random spawn position
-        y: Math.random() * 600,
+        x: Math.random() * WORLD_WIDTH, // Random spawn position in larger world
+        y: Math.random() * WORLD_HEIGHT,
         color: getRandomColor(),
         health: 100,
         maxHealth: 100,
@@ -133,8 +137,8 @@ io.on('connection', (socket) => {
                 setTimeout(() => {
                     if (players[targetId]) {
                         players[targetId].health = 100;
-                        players[targetId].x = Math.random() * 800;
-                        players[targetId].y = Math.random() * 600;
+                        players[targetId].x = Math.random() * WORLD_WIDTH;
+                        players[targetId].y = Math.random() * WORLD_HEIGHT;
                         players[targetId].isBurning = false;
                         players[targetId].isAlive = true;
                         players[targetId].kills = 0; // Reset kills on death
@@ -220,9 +224,19 @@ setInterval(() => {
                         setTimeout(() => {
                             if (players[playerId]) {
                                 players[playerId].health = 100;
-                                players[playerId].x = Math.random() * 800;
-                                players[playerId].y = Math.random() * 600;
+                                players[playerId].x = Math.random() * WORLD_WIDTH;
+                                players[playerId].y = Math.random() * WORLD_HEIGHT;
                                 players[playerId].kills = 0;
+                                players[playerId].spawnProtection = true;
+                                players[playerId].spawnTime = Date.now();
+                                
+                                // Remove spawn protection after 2 seconds
+                                setTimeout(() => {
+                                    if (players[playerId]) {
+                                        players[playerId].spawnProtection = false;
+                                        io.emit('spawnProtectionEnded', { id: playerId });
+                                    }
+                                }, 2000);
                                 
                                 io.emit('playerRespawned', {
                                     id: playerId,

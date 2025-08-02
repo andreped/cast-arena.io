@@ -9,6 +9,17 @@ const ctx = canvas.getContext('2d');
 const minimapCanvas = document.getElementById('minimapCanvas');
 const minimapCtx = minimapCanvas.getContext('2d');
 
+// World and viewport settings
+const CANVAS_WIDTH = canvas.width;
+const CANVAS_HEIGHT = canvas.height;
+const WORLD_WIDTH = CANVAS_WIDTH * 3;  // Triple the size
+const WORLD_HEIGHT = CANVAS_HEIGHT * 3;
+const VIEWPORT_PADDING = 100; // Border padding for camera movement
+
+// Camera position
+let cameraX = 0;
+let cameraY = 0;
+
 // Game state
 let players = {};
 let spells = {};
@@ -135,7 +146,8 @@ document.addEventListener('keydown', (e) => {
     // Cast spell with space
     if (e.key === ' ') {
         e.preventDefault();
-        castSpell(canvas.width / 2, canvas.height / 2); // Cast towards center if no mouse target
+        // Cast towards center of viewport in world coordinates
+        castSpell(cameraX + canvas.width / 2, cameraY + canvas.height / 2);
     }
 });
 
@@ -148,14 +160,16 @@ document.addEventListener('keyup', (e) => {
 // Mouse handling for spell casting
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    // Convert to world coordinates by adding camera position
+    mouseX = e.clientX - rect.left + cameraX;
+    mouseY = e.clientY - rect.top + cameraY;
 });
 
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
-    const targetX = e.clientX - rect.left;
-    const targetY = e.clientY - rect.top;
+    // Convert to world coordinates by adding camera position
+    const targetX = e.clientX - rect.left + cameraX;
+    const targetY = e.clientY - rect.top + cameraY;
     castSpell(targetX, targetY);
 });
 
@@ -242,14 +256,20 @@ function fireInDirection() {
     let targetX, targetY;
     
     if (Math.abs(joystickDirection.x) > 0.1 || Math.abs(joystickDirection.y) > 0.1) {
-        // Fire in joystick direction
-        targetX = player.x + joystickDirection.x * canvas.height;
-        targetY = player.y + joystickDirection.y * canvas.height;
+        // Fire in joystick direction - use world dimensions for better range
+        const maxDistance = Math.max(WORLD_WIDTH, WORLD_HEIGHT);
+        targetX = player.x + joystickDirection.x * maxDistance;
+        targetY = player.y + joystickDirection.y * maxDistance;
     } else {
-        // Fire to the right if no direction
-        targetX = player.x + canvas.height;
+        // Fire in direction player is facing
+        const direction = player.facingLeft ? -1 : 1;
+        targetX = player.x + direction * WORLD_WIDTH;
         targetY = player.y;
     }
+    
+    // Ensure target is within world bounds
+    targetX = Math.max(0, Math.min(WORLD_WIDTH, targetX));
+    targetY = Math.max(0, Math.min(WORLD_HEIGHT, targetY));
     
     castSpell(targetX, targetY);
 }
@@ -259,6 +279,7 @@ function gameLoop() {
     if (!isDead) {
         handleMovement();
     }
+    updateCamera();
     updateSpells();
     render();
     renderMinimap();
@@ -302,9 +323,9 @@ function handleMovement() {
         }
     }
 
-    // Keep player within bounds
-    newX = Math.max(PLAYER_SIZE, Math.min(canvas.width - PLAYER_SIZE, newX));
-    newY = Math.max(PLAYER_SIZE, Math.min(canvas.height - PLAYER_SIZE, newY));
+    // Keep player within world bounds
+    newX = Math.max(PLAYER_SIZE, Math.min(WORLD_WIDTH - PLAYER_SIZE, newX));
+    newY = Math.max(PLAYER_SIZE, Math.min(WORLD_HEIGHT - PLAYER_SIZE, newY));
 
     // Determine facing direction based on movement
     let facingChanged = false;
@@ -338,39 +359,62 @@ function render() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Save context before applying camera transform
+    ctx.save();
+    
+    // Apply camera translation
+    ctx.translate(-cameraX, -cameraY);
+    
+    // Draw world boundaries
+    drawWorldBoundaries();
+    
     // Draw background grid
     drawGrid();
     
-    // Draw all spells
+    // Draw all spells with generous padding for visibility
     Object.values(spells).forEach(spell => {
-        drawSpell(spell);
-        updateSpell(spell);
+        // Draw spells that are visible in the viewport with extra padding for spell trails
+        if (isInViewport(spell.x, spell.y, CANVAS_WIDTH)) { // Use larger padding for spells
+            drawSpell(spell);
+        }
     });
     
     // Draw all players
     Object.values(players).forEach(player => {
-        drawPlayer(player, player.id === myId);
-        drawHealthBar(player);
+        // Only draw players that are visible in the viewport
+        if (isInViewport(player.x, player.y)) {
+            drawPlayer(player, player.id === myId);
+            drawHealthBar(player);
+        }
     });
+    
+    // Restore context after rendering world
+    ctx.restore();
 }
 
 function drawGrid() {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 1;
     
-    // Vertical lines
-    for (let x = 0; x < canvas.width; x += 40) {
+    // Get visible grid area based on camera position
+    const startX = Math.floor(cameraX / 40) * 40;
+    const endX = Math.ceil((cameraX + CANVAS_WIDTH) / 40) * 40;
+    const startY = Math.floor(cameraY / 40) * 40;
+    const endY = Math.ceil((cameraY + CANVAS_HEIGHT) / 40) * 40;
+    
+    // Vertical lines - only draw what's visible in the camera
+    for (let x = startX; x <= endX; x += 40) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
+        ctx.lineTo(x, WORLD_HEIGHT);
         ctx.stroke();
     }
     
-    // Horizontal lines
-    for (let y = 0; y < canvas.height; y += 40) {
+    // Horizontal lines - only draw what's visible in the camera
+    for (let y = startY; y <= endY; y += 40) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
+        ctx.lineTo(WORLD_WIDTH, y);
         ctx.stroke();
     }
 }
@@ -598,14 +642,31 @@ function castSpell(targetX, targetY) {
     const dy = targetY - player.y;
     const length = Math.sqrt(dx * dx + dy * dy);
     
+    if (length === 0) return; // Prevent division by zero
+    
     // Normalize direction and extend to screen width
     const normalizedDx = dx / length;
     const normalizedDy = dy / length;
     
-    // Calculate target point at screen edge
-    const screenDistance = canvas.height; // Travel about screen height distance
-    const finalTargetX = player.x + normalizedDx * screenDistance;
-    const finalTargetY = player.y + normalizedDy * screenDistance;
+    // Calculate target point with much longer distance for the larger world
+    const maxTravelDistance = Math.max(WORLD_WIDTH, WORLD_HEIGHT); // Travel up to the full world size
+    let finalTargetX = player.x + normalizedDx * maxTravelDistance;
+    let finalTargetY = player.y + normalizedDy * maxTravelDistance;
+    
+    // Make sure the target is within world bounds
+    finalTargetX = Math.max(0, Math.min(WORLD_WIDTH, finalTargetX));
+    finalTargetY = Math.max(0, Math.min(WORLD_HEIGHT, finalTargetY));
+    
+    // Update player facing direction based on spell target
+    const facingLeft = dx < 0;
+    if (player.facingLeft !== facingLeft) {
+        player.facingLeft = facingLeft;
+        socket.emit('playerMovement', {
+            x: player.x,
+            y: player.y,
+            facingLeft: facingLeft
+        });
+    }
     
     socket.emit('castSpell', {
         x: player.x,
@@ -717,12 +778,17 @@ function updateSpells() {
             spell.trail = [];
         }
         
-        // Add current position to trail
-        spell.trail.push({ x: spell.x, y: spell.y });
-        
-        // Limit trail length
-        if (spell.trail.length > 8) {
-            spell.trail.shift();
+        // Add current position to trail only if it's moved enough
+        if (spell.trail.length === 0 || 
+            (spell.trail.length > 0 && 
+             (Math.abs(spell.trail[spell.trail.length - 1].x - spell.x) > 5 || 
+              Math.abs(spell.trail[spell.trail.length - 1].y - spell.y) > 5))) {
+            spell.trail.push({ x: spell.x, y: spell.y });
+            
+            // Limit trail length
+            if (spell.trail.length > 8) {
+                spell.trail.shift();
+            }
         }
         
         // Calculate movement
@@ -740,6 +806,10 @@ function updateSpells() {
         const moveDistance = spell.speed * (1/60); // Assuming 60 FPS
         spell.x += (dx / distance) * moveDistance;
         spell.y += (dy / distance) * moveDistance;
+        
+        // Ensure spell stays within world boundaries
+        spell.x = Math.max(0, Math.min(WORLD_WIDTH, spell.x));
+        spell.y = Math.max(0, Math.min(WORLD_HEIGHT, spell.y));
         
         // Check collision with players
         Object.values(players).forEach(player => {
@@ -759,9 +829,9 @@ function updateSpells() {
             }
         });
         
-        // Remove spell after 5 seconds or if it goes off screen
-        if (elapsed > 5 || spell.x < -50 || spell.x > canvas.width + 50 || 
-            spell.y < -50 || spell.y > canvas.height + 50) {
+        // Remove spell after 5 seconds or if it goes off world boundaries
+        if (elapsed > 5 || spell.x < -50 || spell.x > WORLD_WIDTH + 50 || 
+            spell.y < -50 || spell.y > WORLD_HEIGHT + 50) {
             delete spells[spell.id];
         }
     });
@@ -777,9 +847,32 @@ function renderMinimap() {
     minimapCtx.fillStyle = 'rgba(0, 50, 100, 0.8)';
     minimapCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
     
-    // Scale factors
-    const scaleX = minimapCanvas.width / canvas.width;
-    const scaleY = minimapCanvas.height / canvas.height;
+    // Scale factors for entire world
+    const scaleX = minimapCanvas.width / WORLD_WIDTH;
+    const scaleY = minimapCanvas.height / WORLD_HEIGHT;
+    
+    // Draw world boundaries markers on minimap
+    minimapCtx.fillStyle = '#FF0000';
+    minimapCtx.fillRect(0, 0, 5, 5);
+    
+    minimapCtx.fillStyle = '#00FF00';
+    minimapCtx.fillRect(minimapCanvas.width - 5, 0, 5, 5);
+    
+    minimapCtx.fillStyle = '#0000FF';
+    minimapCtx.fillRect(0, minimapCanvas.height - 5, 5, 5);
+    
+    minimapCtx.fillStyle = '#FFFF00';
+    minimapCtx.fillRect(minimapCanvas.width - 5, minimapCanvas.height - 5, 5, 5);
+    
+    // Draw viewport rectangle on minimap
+    minimapCtx.strokeStyle = '#FFFFFF';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.strokeRect(
+        cameraX * scaleX,
+        cameraY * scaleY,
+        CANVAS_WIDTH * scaleX,
+        CANVAS_HEIGHT * scaleY
+    );
     
     // Draw players on minimap
     Object.values(players).forEach(player => {
@@ -788,7 +881,7 @@ function renderMinimap() {
         
         minimapCtx.fillStyle = player.id === myId ? '#FFD700' : player.color;
         minimapCtx.beginPath();
-        minimapCtx.arc(x, y, 3, 0, Math.PI * 2);
+        minimapCtx.arc(x, y, 2, 0, Math.PI * 2);
         minimapCtx.fill();
         
         // Add border for current player
@@ -866,6 +959,81 @@ function updateLeaderboard() {
 function updatePlayerCount() {
     const count = Object.keys(players).length;
     document.getElementById('playerCount').textContent = `Players Online: ${count}`;
+}
+
+function updateCamera() {
+    if (myId && players[myId]) {
+        // Calculate camera position to center on player
+        const player = players[myId];
+        
+        // Smoothly move camera to player
+        const targetX = player.x - CANVAS_WIDTH / 2;
+        const targetY = player.y - CANVAS_HEIGHT / 2;
+        
+        // Apply some smoothing (lerp) for camera movement
+        cameraX += (targetX - cameraX) * 0.1;
+        cameraY += (targetY - cameraY) * 0.1;
+        
+        // Clamp camera to world boundaries
+        cameraX = Math.max(0, Math.min(cameraX, WORLD_WIDTH - CANVAS_WIDTH));
+        cameraY = Math.max(0, Math.min(cameraY, WORLD_HEIGHT - CANVAS_HEIGHT));
+    }
+}
+
+function isInViewport(x, y, extraPadding = 0) {
+    // Ensure all coordinates are properly calculated with respect to the world boundaries
+    return (
+        x >= cameraX - VIEWPORT_PADDING - extraPadding &&
+        x <= cameraX + CANVAS_WIDTH + VIEWPORT_PADDING + extraPadding &&
+        y >= cameraY - VIEWPORT_PADDING - extraPadding &&
+        y <= cameraY + CANVAS_HEIGHT + VIEWPORT_PADDING + extraPadding
+    );
+}
+
+function drawWorldBoundaries() {
+    // Draw a border around the edge of the world
+    ctx.strokeStyle = '#FF4500';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    
+    // Draw some markers at the corners for orientation
+    const markerSize = 30;
+    
+    // Top-left corner
+    ctx.fillStyle = '#FF0000';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(markerSize * 2, 0);
+    ctx.lineTo(0, markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Top-right corner
+    ctx.fillStyle = '#00FF00';
+    ctx.beginPath();
+    ctx.moveTo(WORLD_WIDTH, 0);
+    ctx.lineTo(WORLD_WIDTH - markerSize * 2, 0);
+    ctx.lineTo(WORLD_WIDTH, markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Bottom-left corner
+    ctx.fillStyle = '#0000FF';
+    ctx.beginPath();
+    ctx.moveTo(0, WORLD_HEIGHT);
+    ctx.lineTo(markerSize * 2, WORLD_HEIGHT);
+    ctx.lineTo(0, WORLD_HEIGHT - markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Bottom-right corner
+    ctx.fillStyle = '#FFFF00';
+    ctx.beginPath();
+    ctx.moveTo(WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.lineTo(WORLD_WIDTH - markerSize * 2, WORLD_HEIGHT);
+    ctx.lineTo(WORLD_WIDTH, WORLD_HEIGHT - markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
 }
 
 // Start the game loop
