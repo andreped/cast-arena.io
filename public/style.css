@@ -40,6 +40,7 @@ h1 {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     display: block;
     margin: 0 auto;
+    cursor: crosshair;
 }
 
 #controls {
@@ -52,6 +53,67 @@ h1 {
     margin: 5px 0;
 }
 
+/* Leaderboard Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #2c3e50, #4a6741);
+    margin: 10% auto;
+    padding: 30px;
+    border: 3px solid #34495e;
+    border-radius: 15px;
+    width: 300px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#leaderboardList {
+    text-align: left;
+    margin: 20px 0;
+}
+
+.leaderboard-entry {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 16px;
+}
+
+.leaderboard-entry:last-child {
+    border-bottom: none;
+}
+
+.player-name {
+    color: #4ECDC4;
+}
+
+.player-kills {
+    color: #FF6B6B;
+    font-weight: bold;
+}
+
+.modal-close-hint {
+    margin-top: 20px;
+    font-size: 12px;
+    opacity: 0.6;
+}
+
 /* Add a subtle animation to the canvas */
 #gameCanvas {
     transition: transform 0.1s ease;
@@ -59,4 +121,161 @@ h1 {
 
 #gameCanvas:hover {
     transform: scale(1.02);
+}
+
+#gameArea {
+    position: relative;
+    display: inline-block;
+}
+
+#minimap {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #34495e;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+#minimapCanvas {
+    display: block;
+    border: 1px solid #555;
+    border-radius: 4px;
+}
+
+#minimapTitle {
+    color: white;
+    font-size: 10px;
+    text-align: center;
+    margin-top: 4px;
+    font-weight: bold;
+}
+
+.death-modal {
+    background: linear-gradient(135deg, #8B0000, #DC143C) !important;
+    border: 3px solid #FF0000 !important;
+    animation: deathPulse 0.5s ease-in-out infinite alternate;
+}
+
+.death-modal h2 {
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    font-size: 2em;
+}
+
+@keyframes deathPulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.02); }
+}
+
+#respawnTimer {
+    font-size: 1.5em;
+    color: #FFD700;
+    font-weight: bold;
+}
+
+/* Mobile Controls */
+#mobileControls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    z-index: 100;
+    pointer-events: none;
+}
+
+#joystickContainer {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    pointer-events: auto;
+}
+
+#joystickArea {
+    width: 100px;
+    height: 100px;
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.3);
+    position: relative;
+    touch-action: none;
+}
+
+#joystick {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(45deg, #4ECDC4, #45B7D1);
+    border: 2px solid white;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+#joystickLabel {
+    color: white;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 8px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+#fireButtonContainer {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    pointer-events: auto;
+}
+
+#fireButton {
+    width: 80px;
+    height: 80px;
+    border: 3px solid #FF6B6B;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #FF6B6B, #FF4500);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+#fireButton:active {
+    transform: scale(0.9);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Show mobile controls on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    #mobileControls {
+        display: block;
+    }
+    
+    #gameContainer {
+        padding-bottom: 170px;
+    }
+    
+    body {
+        padding: 10px;
+    }
+    
+    #gameCanvas {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    #minimap {
+        top: 5px;
+        right: 5px;
+    }
 }
