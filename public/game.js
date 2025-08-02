@@ -47,6 +47,12 @@ socket.on('connect', () => {
     console.log('Connected to server with ID:', myId);
 });
 
+socket.on('spawnProtectionEnded', (data) => {
+    if (players[data.id]) {
+        players[data.id].spawnProtection = false;
+    }
+});
+
 socket.on('currentPlayers', (serverPlayers) => {
     players = serverPlayers;
     updatePlayerCount();
@@ -61,6 +67,9 @@ socket.on('playerMoved', (data) => {
     if (players[data.id]) {
         players[data.id].x = data.x;
         players[data.id].y = data.y;
+        if (data.facingLeft !== undefined) {
+            players[data.id].facingLeft = data.facingLeft;
+        }
     }
 });
 
@@ -297,15 +306,30 @@ function handleMovement() {
     newX = Math.max(PLAYER_SIZE, Math.min(canvas.width - PLAYER_SIZE, newX));
     newY = Math.max(PLAYER_SIZE, Math.min(canvas.height - PLAYER_SIZE, newY));
 
-    // Update position if moved
-    if (moved && (newX !== player.x || newY !== player.y)) {
+    // Determine facing direction based on movement
+    let facingChanged = false;
+    if (keys.a || keys.ArrowLeft) {
+        if (!player.facingLeft) {
+            player.facingLeft = true;
+            facingChanged = true;
+        }
+    } else if (keys.d || keys.ArrowRight) {
+        if (player.facingLeft) {
+            player.facingLeft = false;
+            facingChanged = true;
+        }
+    }
+
+    // Update position if moved or facing changed
+    if ((moved && (newX !== player.x || newY !== player.y)) || facingChanged) {
         player.x = newX;
         player.y = newY;
         
         // Send movement to server
         socket.emit('playerMovement', {
             x: newX,
-            y: newY
+            y: newY,
+            facingLeft: player.facingLeft
         });
     }
 }
@@ -354,10 +378,33 @@ function drawGrid() {
 function drawPlayer(player, isMe) {
     const x = player.x;
     const y = player.y;
+    const facingLeft = player.facingLeft;
+    const isDead = player.health <= 0;
+    
+    // Save context to restore later
+    ctx.save();
+    
+    // Spawn protection effect
+    if (player.spawnProtection) {
+        const time = Date.now();
+        const pulse = Math.sin(time * 0.01) * 0.3 + 0.7;
+        
+        // Blue protection aura
+        ctx.globalAlpha = pulse * 0.8;
+        ctx.fillStyle = '#4169E1';
+        ctx.beginPath();
+        ctx.arc(x, y, PLAYER_SIZE + 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.globalAlpha = pulse * 0.5;
+        ctx.fillStyle = '#6495ED';
+        ctx.beginPath();
+        ctx.arc(x, y, PLAYER_SIZE + 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
     
     // Draw burning effect
     if (player.isBurning) {
-        ctx.save();
         const time = Date.now();
         const flicker = Math.sin(time * 0.01) * 0.3 + 0.7;
         
@@ -373,52 +420,123 @@ function drawPlayer(player, isMe) {
         ctx.beginPath();
         ctx.arc(x, y, PLAYER_SIZE + 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
     }
     
-    // Draw wizard body (circle)
-    ctx.fillStyle = player.color;
-    ctx.beginPath();
-    ctx.arc(x, y, PLAYER_SIZE, 0, Math.PI * 2);
-    ctx.fill();
+    // Reset alpha
+    ctx.globalAlpha = 1;
     
-    // Add border for current player
-    if (isMe) {
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 3;
+    if (isDead) {
+        // Draw dead wizard (ghost)
+        
+        // Ghost body
+        ctx.fillStyle = 'rgba(220, 220, 220, 0.8)';
+        ctx.beginPath();
+        ctx.arc(x, y, PLAYER_SIZE - 2, 0, Math.PI, true);
+        ctx.lineTo(x - PLAYER_SIZE + 2, y + PLAYER_SIZE - 2);
+        ctx.lineTo(x - PLAYER_SIZE / 2, y + PLAYER_SIZE / 2);
+        ctx.lineTo(x, y + PLAYER_SIZE);
+        ctx.lineTo(x + PLAYER_SIZE / 2, y + PLAYER_SIZE / 2);
+        ctx.lineTo(x + PLAYER_SIZE - 2, y + PLAYER_SIZE - 2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Ghost eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(x - 5, y - 2, 3, 0, Math.PI * 2);
+        ctx.arc(x + 5, y - 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Ghost mouth
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y + 5, 5, 0.1 * Math.PI, 0.9 * Math.PI);
         ctx.stroke();
+        
+    } else {
+        // Draw living wizard
+        ctx.scale(facingLeft ? -1 : 1, 1);
+        const flippedX = facingLeft ? -x : x;
+        
+        // Draw wizard body (circle)
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.arc(flippedX, y, PLAYER_SIZE, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add border for current player
+        if (isMe) {
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+        
+        // Draw wizard robe bottom
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.moveTo(flippedX - PLAYER_SIZE, y);
+        ctx.lineTo(flippedX - PLAYER_SIZE + 5, y + PLAYER_SIZE + 5);
+        ctx.lineTo(flippedX + PLAYER_SIZE - 5, y + PLAYER_SIZE + 5);
+        ctx.lineTo(flippedX + PLAYER_SIZE, y);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw wizard hat
+        ctx.fillStyle = '#4A4A4A';
+        ctx.beginPath();
+        ctx.moveTo(flippedX - 15, y - 15);
+        ctx.lineTo(flippedX, y - 35);
+        ctx.lineTo(flippedX + 15, y - 15);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Hat star
+        ctx.fillStyle = '#FFD700';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('⭐', flippedX, y - 20);
+        
+        // Draw wizard face
+        ctx.fillStyle = '#FFE4C4'; // Skin tone
+        ctx.beginPath();
+        ctx.arc(flippedX, y - 2, 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(flippedX - 4, y - 5, 2, 0, Math.PI * 2);
+        ctx.arc(flippedX + 4, y - 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Beard
+        ctx.fillStyle = '#DDDDDD';
+        ctx.beginPath();
+        ctx.moveTo(flippedX - 8, y - 2);
+        ctx.lineTo(flippedX, y + 10);
+        ctx.lineTo(flippedX + 8, y - 2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw wizard staff
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(flippedX + 20, y - 10);
+        ctx.lineTo(flippedX + 20, y + 25);
+        ctx.stroke();
+        
+        // Staff orb
+        ctx.fillStyle = '#9370DB';
+        ctx.beginPath();
+        ctx.arc(flippedX + 20, y - 15, 5, 0, Math.PI * 2);
+        ctx.fill();
     }
     
-    // Draw wizard hat
-    ctx.fillStyle = '#4A4A4A';
-    ctx.beginPath();
-    ctx.moveTo(x - 15, y - 15);
-    ctx.lineTo(x, y - 35);
-    ctx.lineTo(x + 15, y - 15);
-    ctx.closePath();
-    ctx.fill();
+    ctx.restore();
     
-    // Hat star
-    ctx.fillStyle = '#FFD700';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('⭐', x, y - 20);
-    
-    // Draw wizard staff
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(x + 20, y - 10);
-    ctx.lineTo(x + 20, y + 25);
-    ctx.stroke();
-    
-    // Staff orb
-    ctx.fillStyle = '#9370DB';
-    ctx.beginPath();
-    ctx.arc(x + 20, y - 15, 5, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Player ID (for debugging)
+    // Player tag (always upright)
     if (isMe) {
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '12px Arial';

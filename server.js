@@ -30,7 +30,10 @@ io.on('connection', (socket) => {
         kills: 0,
         isBurning: false,
         burnEndTime: 0,
-        isAlive: true
+        isAlive: true,
+        spawnProtection: true,
+        spawnTime: Date.now(),
+        facingLeft: false
     };
 
     // Send current players to new player
@@ -38,6 +41,14 @@ io.on('connection', (socket) => {
 
     // Notify other players about new player
     socket.broadcast.emit('newPlayer', players[socket.id]);
+    
+    // Remove spawn protection after 2 seconds
+    setTimeout(() => {
+        if (players[socket.id]) {
+            players[socket.id].spawnProtection = false;
+            io.emit('spawnProtectionEnded', { id: socket.id });
+        }
+    }, 2000);
 
     // Handle player movement
     socket.on('playerMovement', (movementData) => {
@@ -45,11 +56,17 @@ io.on('connection', (socket) => {
             players[socket.id].x = movementData.x;
             players[socket.id].y = movementData.y;
             
+            // Track facing direction
+            if (movementData.facingLeft !== undefined) {
+                players[socket.id].facingLeft = movementData.facingLeft;
+            }
+            
             // Broadcast movement to other players
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
                 x: movementData.x,
-                y: movementData.y
+                y: movementData.y,
+                facingLeft: players[socket.id].facingLeft
             });
         }
     });
@@ -87,6 +104,11 @@ io.on('connection', (socket) => {
         const caster = players[spell?.casterId];
         
         if (spell && target && caster && targetId !== spell.casterId) {
+            // Skip if player has spawn protection
+            if (target.spawnProtection) {
+                return;
+            }
+            
             // Apply damage
             target.health -= spell.damage;
             
@@ -116,7 +138,17 @@ io.on('connection', (socket) => {
                         players[targetId].isBurning = false;
                         players[targetId].isAlive = true;
                         players[targetId].kills = 0; // Reset kills on death
+                        players[targetId].spawnProtection = true;
+                        players[targetId].spawnTime = Date.now();
                         delete burnEffects[targetId];
+                        
+                        // Remove spawn protection after 2 seconds
+                        setTimeout(() => {
+                            if (players[targetId]) {
+                                players[targetId].spawnProtection = false;
+                                io.emit('spawnProtectionEnded', { id: targetId });
+                            }
+                        }, 2000);
                         
                         io.emit('playerRespawned', {
                             id: targetId,
