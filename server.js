@@ -94,6 +94,7 @@ io.on('connection', (socket) => {
                 y: spellData.y,
                 targetX: spellData.targetX,
                 targetY: spellData.targetY,
+                angle: spellData.angle || Math.atan2(spellData.targetY - spellData.y, spellData.targetX - spellData.x), // Use provided angle or calculate it
                 speed: 200, // pixels per second - slower for better visibility
                 damage: 20,
                 createdAt: Date.now(),

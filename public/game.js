@@ -269,14 +269,41 @@ document.addEventListener('keydown', (e) => {
         
         if (!myId || !players[myId] || isDead) return;
         
-        // Cast in the direction player is facing
         const player = players[myId];
+        
+        // Get current mouse position in viewport space
+        const mouseViewportX = mouseX - cameraX;
+        const mouseViewportY = mouseY - cameraY;
+        
+        // Get player position in viewport space
+        const playerViewportX = player.x - cameraX;
+        const playerViewportY = player.y - cameraY;
+        
+        // If we have a valid mouse position, use that for direction
+        if (mouseX !== 0 || mouseY !== 0) {
+            // Calculate direction from player to mouse in viewport space
+            const dirX = mouseViewportX - playerViewportX;
+            const dirY = mouseViewportY - playerViewportY;
+            
+            // Normalize the direction
+            const length = Math.sqrt(dirX * dirX + dirY * dirY);
+            if (length > 0) {
+                const normalizedDirX = dirX / length;
+                const normalizedDirY = dirY / length;
+                
+                // Calculate target point at fixed distance from player
+                const targetX = player.x + normalizedDirX * 1000;
+                const targetY = player.y + normalizedDirY * 1000;
+                
+                castSpell(targetX, targetY);
+                return;
+            }
+        }
+        
+        // Fall back to facing direction if no valid mouse position
         const direction = player.facingLeft ? -1 : 1;
-        
-        // Cast toward a point in front of the player
-        const targetX = player.x + direction * WORLD_WIDTH/2; // Half the world width in facing direction
-        const targetY = player.y; // Same height as player
-        
+        const targetX = player.x + direction * 1000;
+        const targetY = player.y;
         castSpell(targetX, targetY);
     }
 });
@@ -290,30 +317,63 @@ document.addEventListener('keyup', (e) => {
 // Mouse handling for spell casting
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    // Convert screen coordinates to viewport coordinates
+    // Store both screen and world coordinates
     const viewportX = e.clientX - rect.left;
     const viewportY = e.clientY - rect.top;
     
     // Convert viewport coordinates to world coordinates by adding camera position
     mouseX = viewportX + cameraX;
     mouseY = viewportY + cameraY;
+    
+    // Log coordinates for debugging
+    if (myId && players[myId] && Math.random() < 0.01) { // Only log occasionally
+        const player = players[myId];
+        console.log('Mouse tracking:', {
+            viewport: { x: viewportX, y: viewportY },
+            world: { x: mouseX, y: mouseY },
+            player: { x: player.x, y: player.y },
+            camera: { x: cameraX, y: cameraY }
+        });
+    }
 });
 
 canvas.addEventListener('click', (e) => {
     if (!myId || !players[myId] || isDead) return;
     
     const rect = canvas.getBoundingClientRect();
+    const player = players[myId];
     
-    // Convert screen coordinates to viewport coordinates
+    // Get mouse position in viewport coordinates
     const viewportX = e.clientX - rect.left;
     const viewportY = e.clientY - rect.top;
     
-    // Convert viewport coordinates to world coordinates by adding camera position
-    const worldX = viewportX + cameraX;
-    const worldY = viewportY + cameraY;
+    // Get player position in viewport coordinates by subtracting camera position
+    const playerViewportX = player.x - cameraX;
+    const playerViewportY = player.y - cameraY;
     
-    console.log('Casting spell from', players[myId].x, players[myId].y, 'to', worldX, worldY);
-    castSpell(worldX, worldY);
+    // Calculate direction vector in viewport space
+    const dirX = viewportX - playerViewportX;
+    const dirY = viewportY - playerViewportY;
+    
+    // Normalize the direction vector
+    const length = Math.sqrt(dirX * dirX + dirY * dirY);
+    const normalizedDirX = dirX / length;
+    const normalizedDirY = dirY / length;
+    
+    // Use a fixed distance for the target point
+    const targetDistance = 1000;
+    const targetX = player.x + normalizedDirX * targetDistance;
+    const targetY = player.y + normalizedDirY * targetDistance;
+    
+    console.log('Spell direction:', {
+        player: { x: player.x, y: player.y },
+        viewport: { x: viewportX, y: viewportY },
+        playerViewport: { x: playerViewportX, y: playerViewportY },
+        direction: { x: normalizedDirX, y: normalizedDirY },
+        target: { x: targetX, y: targetY }
+    });
+    
+    castSpell(targetX, targetY);
 });
 
 // Mobile touch controls
@@ -399,20 +459,25 @@ function fireInDirection() {
     let targetX, targetY;
     
     if (Math.abs(joystickDirection.x) > 0.1 || Math.abs(joystickDirection.y) > 0.1) {
-        // Fire in joystick direction
+        // Fire in joystick direction - always relative to player position
         console.log('Firing in joystick direction:', joystickDirection.x, joystickDirection.y);
         
-        // Calculate a point in the joystick direction from the player's position
-        // We use a large distance so the spell travels far enough
-        const diagonalDistance = Math.sqrt(WORLD_WIDTH*WORLD_WIDTH + WORLD_HEIGHT*WORLD_HEIGHT);
-        targetX = player.x + joystickDirection.x * diagonalDistance;
-        targetY = player.y + joystickDirection.y * diagonalDistance;
+        // Direction needs to be normalized to get a clean angle
+        const joyLength = Math.sqrt(joystickDirection.x * joystickDirection.x + joystickDirection.y * joystickDirection.y);
+        const normJoyX = joystickDirection.x / joyLength;
+        const normJoyY = joystickDirection.y / joyLength;
+        
+        // Calculate target point at fixed distance in joystick direction
+        const fireDistance = 1000; // A fixed distance for consistent targeting
+        targetX = player.x + normJoyX * fireDistance;
+        targetY = player.y + normJoyY * fireDistance;
     } else {
         // Fire in direction player is facing
         const direction = player.facingLeft ? -1 : 1;
         console.log('Firing in facing direction:', direction);
         
-        targetX = player.x + direction * WORLD_WIDTH/2; // Half world width in facing direction
+        // Use a fixed distance for consistent targeting
+        targetX = player.x + direction * 1000;
         targetY = player.y;
     }
     
@@ -814,31 +879,39 @@ function castSpell(targetX, targetY) {
     
     const player = players[myId];
     
-    // Calculate direction vector from player to target in world coordinates
+    // Calculate direction vector from player to target
     const dx = targetX - player.x;
     const dy = targetY - player.y;
     const length = Math.sqrt(dx * dx + dy * dy);
     
     if (length === 0) return; // Prevent division by zero
     
-    console.log('Spell direction:', dx, dy, 'length:', length);
-    
     // Normalize direction vector
     const normalizedDx = dx / length;
     const normalizedDy = dy / length;
     
-    // Calculate target point with much longer distance
-    // We'll set the distance to diagonal of the world for maximum range
-    const maxTravelDistance = Math.sqrt(WORLD_WIDTH*WORLD_WIDTH + WORLD_HEIGHT*WORLD_HEIGHT);
-    let finalTargetX = player.x + normalizedDx * maxTravelDistance;
-    let finalTargetY = player.y + normalizedDy * maxTravelDistance;
+    // Calculate angle in radians, from -PI to PI
+    const angle = Math.atan2(normalizedDy, normalizedDx);
     
-    // Make sure the target is within world bounds
-    finalTargetX = Math.max(0, Math.min(WORLD_WIDTH, finalTargetX));
-    finalTargetY = Math.max(0, Math.min(WORLD_HEIGHT, finalTargetY));
+    // Set spell starting point at the player's position
+    const spellStartX = player.x;
+    const spellStartY = player.y;
     
-    // Update player facing direction based on spell target
-    const facingLeft = dx < 0;
+    // Use fixed target distance to ensure consistent behavior
+    const targetDistance = 1000;
+    const finalTargetX = player.x + normalizedDx * targetDistance;
+    const finalTargetY = player.y + normalizedDy * targetDistance;
+    
+    // Debug logging
+    console.log('Casting spell:', {
+        from: { x: player.x, y: player.y },
+        direction: { dx: normalizedDx, dy: normalizedDy },
+        angle: angle * (180 / Math.PI), // Convert to degrees for logging
+        target: { x: finalTargetX, y: finalTargetY }
+    });
+    
+    // Update player facing direction based on spell direction
+    const facingLeft = normalizedDx < 0;
     if (player.facingLeft !== facingLeft) {
         player.facingLeft = facingLeft;
         socket.emit('playerMovement', {
@@ -848,21 +921,39 @@ function castSpell(targetX, targetY) {
         });
     }
     
-    // Send spell cast event to server
+    // Send spell cast event to server with precise coordinates and angle
     socket.emit('castSpell', {
-        x: player.x,
-        y: player.y,
+        x: spellStartX,
+        y: spellStartY,
         targetX: finalTargetX,
-        targetY: finalTargetY
+        targetY: finalTargetY,
+        angle: angle, // Store exact angle for precise movement
+        directionX: normalizedDx, // Store normalized direction for consistency
+        directionY: normalizedDy
     });
 }
 
 function drawSpell(spell) {
     if (!spell) return;
     
+    ctx.save();
+    
+    // Get spell direction angle
+    let angle;
+    if (spell.angle !== undefined) {
+        angle = spell.angle;
+    } else if (spell.trail && spell.trail.length >= 2) {
+        // Calculate angle from last two trail points
+        const last = spell.trail[spell.trail.length-1];
+        const prev = spell.trail[spell.trail.length-2];
+        angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+    } else {
+        // Default to right direction if we can't determine angle
+        angle = 0;
+    }
+    
     // Draw fireball trail
     if (spell.trail && spell.trail.length > 0) {
-        ctx.save();
         for (let i = 0; i < spell.trail.length; i++) {
             const trailPoint = spell.trail[i];
             const alpha = (i + 1) / spell.trail.length * 0.6; // Fade effect
@@ -874,28 +965,32 @@ function drawSpell(spell) {
             ctx.arc(trailPoint.x, trailPoint.y, size, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.restore();
     }
     
-    // Draw fireball
-    ctx.save();
+    // Reset alpha
+    ctx.globalAlpha = 1;
     
-    // Outer fire
+    // Translate to spell position and rotate
+    ctx.translate(spell.x, spell.y);
+    ctx.rotate(angle);
+    
+    // Draw elongated fireball shape
+    // Outer fire (elongated)
     ctx.fillStyle = '#FF4500';
     ctx.beginPath();
-    ctx.arc(spell.x, spell.y, SPELL_SIZE + 2, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, SPELL_SIZE + 5, SPELL_SIZE, 0, 0, Math.PI * 2);
     ctx.fill();
     
-    // Inner fire
+    // Inner fire (elongated)
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
-    ctx.arc(spell.x, spell.y, SPELL_SIZE, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, SPELL_SIZE + 2, SPELL_SIZE - 2, 0, 0, Math.PI * 2);
     ctx.fill();
     
     // Fire core
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
-    ctx.arc(spell.x, spell.y, SPELL_SIZE / 2, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, SPELL_SIZE / 2, SPELL_SIZE / 3, 0, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.restore();
@@ -907,21 +1002,58 @@ function updateSpell(spell) {
     const now = Date.now();
     const elapsed = (now - spell.createdAt) / 1000;
     
-    // Calculate movement
-    const dx = spell.targetX - spell.x;
-    const dy = spell.targetY - spell.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Use stored direction if available, otherwise calculate it
+    let dx, dy;
     
-    if (distance < 5) {
-        // Spell reached target, remove it
-        delete spells[spell.id];
-        return;
+    if (spell.directionX !== undefined && spell.directionY !== undefined) {
+        // Use the stored normalized direction vectors
+        dx = spell.directionX;
+        dy = spell.directionY;
+    } else if (spell.angle !== undefined) {
+        // Use the stored angle if direction vectors aren't available
+        dx = Math.cos(spell.angle);
+        dy = Math.sin(spell.angle);
+    } else {
+        // Last resort: calculate direction from current position to target
+        const deltaX = spell.targetX - spell.x;
+        const deltaY = spell.targetY - spell.y;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance < 5) {
+            // Spell reached target, remove it
+            delete spells[spell.id];
+            return;
+        }
+        
+        dx = deltaX / distance;
+        dy = deltaY / distance;
     }
     
-    // Move spell
+    // Maintain trail history for visual effects
+    if (!spell.trail) {
+        spell.trail = [];
+    }
+    
+    // Keep trail at fixed length
+    if (spell.trail.length > 10) {
+        spell.trail.shift();
+    }
+    spell.trail.push({x: spell.x, y: spell.y});
+    
+    // Move spell with fixed speed
     const moveDistance = spell.speed * (1/60); // Assuming 60 FPS
-    spell.x += (dx / distance) * moveDistance;
-    spell.y += (dy / distance) * moveDistance;
+    spell.x += dx * moveDistance;
+    spell.y += dy * moveDistance;
+    
+    // Debug log occasionally
+    if (Math.random() < 0.01) {
+        console.log('Spell movement:', {
+            id: spell.id,
+            pos: { x: spell.x, y: spell.y },
+            direction: { dx, dy },
+            angle: spell.angle * (180 / Math.PI)
+        });
+    }
     
     // Check collision with players
     Object.values(players).forEach(player => {
