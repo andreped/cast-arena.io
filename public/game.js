@@ -9,6 +9,17 @@ const ctx = canvas.getContext('2d');
 const minimapCanvas = document.getElementById('minimapCanvas');
 const minimapCtx = minimapCanvas.getContext('2d');
 
+// World and viewport settings
+const CANVAS_WIDTH = canvas.width;
+const CANVAS_HEIGHT = canvas.height;
+const WORLD_WIDTH = CANVAS_WIDTH * 3;  // Triple the size
+const WORLD_HEIGHT = CANVAS_HEIGHT * 3;
+const VIEWPORT_PADDING = 100; // Border padding for camera movement
+
+// Camera position
+let cameraX = 0;
+let cameraY = 0;
+
 // Game state
 let players = {};
 let spells = {};
@@ -47,6 +58,15 @@ socket.on('connect', () => {
     console.log('Connected to server with ID:', myId);
 });
 
+// We no longer need a separate setInitialPosition event
+// Initial position is now set through playerRespawned event for consistency
+
+socket.on('spawnProtectionEnded', (data) => {
+    if (players[data.id]) {
+        players[data.id].spawnProtection = false;
+    }
+});
+
 socket.on('currentPlayers', (serverPlayers) => {
     players = serverPlayers;
     updatePlayerCount();
@@ -61,12 +81,69 @@ socket.on('playerMoved', (data) => {
     if (players[data.id]) {
         players[data.id].x = data.x;
         players[data.id].y = data.y;
+        if (data.facingLeft !== undefined) {
+            players[data.id].facingLeft = data.facingLeft;
+        }
+        // If the server sends isAlive state with movement, update that too
+        if (data.isAlive !== undefined) {
+            const wasAlive = players[data.id].isAlive;
+            if (wasAlive !== data.isAlive) {
+                console.log(`Player ${data.id} alive state changed during movement: ${wasAlive} -> ${data.isAlive}`);
+                players[data.id].isAlive = data.isAlive;
+            }
+        }
+    }
+});
+
+socket.on('playerPositionUpdate', (data) => {
+    if (players[data.id]) {
+        // Only update other players' positions this way, not the local player
+        // This prevents position conflicts with local movement prediction
+        if (data.id !== myId) {
+            players[data.id].x = data.x;
+            players[data.id].y = data.y;
+        }
+    }
+});
+
+// Force sync a player's full state - use this to ensure consistent state across clients
+socket.on('forceSyncPlayer', (data) => {
+    if (players[data.id]) {
+        console.log(`Force syncing player ${data.id} state:`, data);
+        // Update all properties provided by the server
+        Object.keys(data).forEach(key => {
+            if (key !== 'id') { // Skip the id since we use it as the object key
+                players[data.id][key] = data[key];
+            }
+        });
+        
+        // Debug logging for important state changes
+        console.log(`Player ${data.id} after force sync: isAlive=${players[data.id].isAlive}, health=${players[data.id].health}`);
     }
 });
 
 socket.on('playerDisconnected', (playerId) => {
     delete players[playerId];
     updatePlayerCount();
+});
+
+// Player state update handling
+socket.on('playerStateUpdate', (data) => {
+    if (players[data.id]) {
+        // Update player's alive state and health
+        const wasAlive = players[data.id].isAlive;
+        players[data.id].isAlive = data.isAlive;
+        players[data.id].health = data.health;
+        
+        console.log(`Player ${data.id} state update: isAlive ${wasAlive} -> ${data.isAlive}, health: ${data.health}`);
+        
+        // If a player is transitioning from dead to alive, make sure to clear any effects
+        if (!wasAlive && data.isAlive === true) {
+            players[data.id].isBurning = false;
+            players[data.id].burnEndTime = 0;
+            console.log(`Player ${data.id} resurrected from dead to alive state`);
+        }
+    }
 });
 
 // Combat events
@@ -76,9 +153,14 @@ socket.on('spellCast', (spell) => {
 
 socket.on('healthUpdate', (data) => {
     if (players[data.id]) {
+        const prevHealth = players[data.id].health;
+        const prevBurning = players[data.id].isBurning;
+        
         players[data.id].health = data.health;
         players[data.id].isBurning = data.isBurning;
         players[data.id].burnEndTime = data.burnEndTime;
+        
+        console.log(`Health update for player ${data.id}: health ${prevHealth} -> ${data.health}, burning ${prevBurning} -> ${data.isBurning}`);
     }
 });
 
@@ -90,11 +172,56 @@ socket.on('playerKilled', (data) => {
 
 socket.on('playerRespawned', (data) => {
     if (players[data.id]) {
+        console.log('Player spawned/respawned:', data.id, 'at position:', data.x, data.y);
+        
+        // Update player properties with server data
         players[data.id].x = data.x;
         players[data.id].y = data.y;
         players[data.id].health = data.health;
         players[data.id].kills = data.kills;
+        
+        // IMPORTANT: Reset all effects and state completely
         players[data.id].isBurning = false;
+        players[data.id].burnEndTime = 0;
+        players[data.id].isAlive = true; // Explicitly mark player as alive
+        players[data.id].spawnProtection = true;
+        players[data.id].isRespawning = true; // Flag to prevent movement for a short time
+        
+        // If this is the current player, handle spawn/respawn
+        if (data.id === myId) {
+            // Clear any movement input state
+            Object.keys(keys).forEach(key => {
+                keys[key] = false;
+            });
+            
+            // Reset joystick if on mobile
+            if (isMobile) {
+                joystickActive = false;
+                joystickDirection = { x: 0, y: 0 };
+            }
+            
+            // Set isDead to false - works for both initial spawn and respawn
+            isDead = false;
+            
+            // Immediately update camera position without smoothing
+            updateCamera(true);
+            
+            // Hide death modal if it's showing (only relevant for respawn)
+            const deathModal = document.getElementById('deathModal');
+            if (deathModal.style.display === 'block') {
+                deathModal.style.display = 'none';
+            }
+            
+            console.log('Player fully respawned with isAlive =', players[myId].isAlive);
+            
+            // Allow movement again after a delay
+            setTimeout(() => {
+                if (players[myId]) {
+                    console.log('Movement enabled for player:', myId);
+                    players[myId].isRespawning = false;
+                }
+            }, 1000); // 1 second delay before allowing movement
+        }
     }
 });
 
@@ -106,7 +233,20 @@ socket.on('burnEnded', (data) => {
 
 socket.on('playerDied', () => {
     isDead = true;
+    
+    // Mark player as dead in local state
+    if (myId && players[myId]) {
+        console.log('Player died, setting isAlive to false');
+        players[myId].isAlive = false;
+        players[myId].health = 0;
+    }
+    
     showDeathModal();
+    
+    // Disable all key inputs to prevent movement while dead
+    Object.keys(keys).forEach(key => {
+        keys[key] = false;
+    });
 });
 
 // Input handling
@@ -126,7 +266,45 @@ document.addEventListener('keydown', (e) => {
     // Cast spell with space
     if (e.key === ' ') {
         e.preventDefault();
-        castSpell(canvas.width / 2, canvas.height / 2); // Cast towards center if no mouse target
+        
+        if (!myId || !players[myId] || isDead) return;
+        
+        const player = players[myId];
+        
+        // Get current mouse position in viewport space
+        const mouseViewportX = mouseX - cameraX;
+        const mouseViewportY = mouseY - cameraY;
+        
+        // Get player position in viewport space
+        const playerViewportX = player.x - cameraX;
+        const playerViewportY = player.y - cameraY;
+        
+        // If we have a valid mouse position, use that for direction
+        if (mouseX !== 0 || mouseY !== 0) {
+            // Calculate direction from player to mouse in viewport space
+            const dirX = mouseViewportX - playerViewportX;
+            const dirY = mouseViewportY - playerViewportY;
+            
+            // Normalize the direction
+            const length = Math.sqrt(dirX * dirX + dirY * dirY);
+            if (length > 0) {
+                const normalizedDirX = dirX / length;
+                const normalizedDirY = dirY / length;
+                
+                // Calculate target point at fixed distance from player
+                const targetX = player.x + normalizedDirX * 1000;
+                const targetY = player.y + normalizedDirY * 1000;
+                
+                castSpell(targetX, targetY);
+                return;
+            }
+        }
+        
+        // Fall back to facing direction if no valid mouse position
+        const direction = player.facingLeft ? -1 : 1;
+        const targetX = player.x + direction * 1000;
+        const targetY = player.y;
+        castSpell(targetX, targetY);
     }
 });
 
@@ -139,14 +317,62 @@ document.addEventListener('keyup', (e) => {
 // Mouse handling for spell casting
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    // Store both screen and world coordinates
+    const viewportX = e.clientX - rect.left;
+    const viewportY = e.clientY - rect.top;
+    
+    // Convert viewport coordinates to world coordinates by adding camera position
+    mouseX = viewportX + cameraX;
+    mouseY = viewportY + cameraY;
+    
+    // Log coordinates for debugging
+    if (myId && players[myId] && Math.random() < 0.01) { // Only log occasionally
+        const player = players[myId];
+        console.log('Mouse tracking:', {
+            viewport: { x: viewportX, y: viewportY },
+            world: { x: mouseX, y: mouseY },
+            player: { x: player.x, y: player.y },
+            camera: { x: cameraX, y: cameraY }
+        });
+    }
 });
 
 canvas.addEventListener('click', (e) => {
+    if (!myId || !players[myId] || isDead) return;
+    
     const rect = canvas.getBoundingClientRect();
-    const targetX = e.clientX - rect.left;
-    const targetY = e.clientY - rect.top;
+    const player = players[myId];
+    
+    // Get mouse position in viewport coordinates
+    const viewportX = e.clientX - rect.left;
+    const viewportY = e.clientY - rect.top;
+    
+    // Get player position in viewport coordinates by subtracting camera position
+    const playerViewportX = player.x - cameraX;
+    const playerViewportY = player.y - cameraY;
+    
+    // Calculate direction vector in viewport space
+    const dirX = viewportX - playerViewportX;
+    const dirY = viewportY - playerViewportY;
+    
+    // Normalize the direction vector
+    const length = Math.sqrt(dirX * dirX + dirY * dirY);
+    const normalizedDirX = dirX / length;
+    const normalizedDirY = dirY / length;
+    
+    // Use a fixed distance for the target point
+    const targetDistance = 1000;
+    const targetX = player.x + normalizedDirX * targetDistance;
+    const targetY = player.y + normalizedDirY * targetDistance;
+    
+    console.log('Spell direction:', {
+        player: { x: player.x, y: player.y },
+        viewport: { x: viewportX, y: viewportY },
+        playerViewport: { x: playerViewportX, y: playerViewportY },
+        direction: { x: normalizedDirX, y: normalizedDirY },
+        target: { x: targetX, y: targetY }
+    });
+    
     castSpell(targetX, targetY);
 });
 
@@ -233,15 +459,33 @@ function fireInDirection() {
     let targetX, targetY;
     
     if (Math.abs(joystickDirection.x) > 0.1 || Math.abs(joystickDirection.y) > 0.1) {
-        // Fire in joystick direction
-        targetX = player.x + joystickDirection.x * canvas.height;
-        targetY = player.y + joystickDirection.y * canvas.height;
+        // Fire in joystick direction - always relative to player position
+        console.log('Firing in joystick direction:', joystickDirection.x, joystickDirection.y);
+        
+        // Direction needs to be normalized to get a clean angle
+        const joyLength = Math.sqrt(joystickDirection.x * joystickDirection.x + joystickDirection.y * joystickDirection.y);
+        const normJoyX = joystickDirection.x / joyLength;
+        const normJoyY = joystickDirection.y / joyLength;
+        
+        // Calculate target point at fixed distance in joystick direction
+        const fireDistance = 1000; // A fixed distance for consistent targeting
+        targetX = player.x + normJoyX * fireDistance;
+        targetY = player.y + normJoyY * fireDistance;
     } else {
-        // Fire to the right if no direction
-        targetX = player.x + canvas.height;
+        // Fire in direction player is facing
+        const direction = player.facingLeft ? -1 : 1;
+        console.log('Firing in facing direction:', direction);
+        
+        // Use a fixed distance for consistent targeting
+        targetX = player.x + direction * 1000;
         targetY = player.y;
     }
     
+    // Ensure target is within world bounds
+    targetX = Math.max(0, Math.min(WORLD_WIDTH, targetX));
+    targetY = Math.max(0, Math.min(WORLD_HEIGHT, targetY));
+    
+    console.log('Mobile fire from', player.x, player.y, 'to', targetX, targetY);
     castSpell(targetX, targetY);
 }
 
@@ -250,6 +494,7 @@ function gameLoop() {
     if (!isDead) {
         handleMovement();
     }
+    updateCamera();
     updateSpells();
     render();
     renderMinimap();
@@ -260,6 +505,13 @@ function handleMovement() {
     if (!myId || !players[myId]) return;
 
     const player = players[myId];
+    
+    // Don't allow movement during respawn transition or death
+    if (isDead || player.isRespawning) {
+        // Don't process any movement
+        return;
+    }
+    
     let moved = false;
     
     let newX = player.x;
@@ -293,19 +545,34 @@ function handleMovement() {
         }
     }
 
-    // Keep player within bounds
-    newX = Math.max(PLAYER_SIZE, Math.min(canvas.width - PLAYER_SIZE, newX));
-    newY = Math.max(PLAYER_SIZE, Math.min(canvas.height - PLAYER_SIZE, newY));
+    // Keep player within world bounds
+    newX = Math.max(PLAYER_SIZE, Math.min(WORLD_WIDTH - PLAYER_SIZE, newX));
+    newY = Math.max(PLAYER_SIZE, Math.min(WORLD_HEIGHT - PLAYER_SIZE, newY));
 
-    // Update position if moved
-    if (moved && (newX !== player.x || newY !== player.y)) {
+    // Determine facing direction based on movement
+    let facingChanged = false;
+    if (keys.a || keys.ArrowLeft) {
+        if (!player.facingLeft) {
+            player.facingLeft = true;
+            facingChanged = true;
+        }
+    } else if (keys.d || keys.ArrowRight) {
+        if (player.facingLeft) {
+            player.facingLeft = false;
+            facingChanged = true;
+        }
+    }
+
+    // Update position if moved or facing changed
+    if ((moved && (newX !== player.x || newY !== player.y)) || facingChanged) {
         player.x = newX;
         player.y = newY;
         
         // Send movement to server
         socket.emit('playerMovement', {
             x: newX,
-            y: newY
+            y: newY,
+            facingLeft: player.facingLeft
         });
     }
 }
@@ -314,39 +581,72 @@ function render() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Save context before applying camera transform
+    ctx.save();
+    
+    // Apply camera translation
+    ctx.translate(-cameraX, -cameraY);
+    
+    // Draw world boundaries
+    drawWorldBoundaries();
+    
     // Draw background grid
     drawGrid();
     
-    // Draw all spells
+    // Draw all spells with generous padding for visibility
     Object.values(spells).forEach(spell => {
-        drawSpell(spell);
-        updateSpell(spell);
+        // Draw spells that are visible in the viewport with extra padding for spell trails
+        if (isInViewport(spell.x, spell.y, CANVAS_WIDTH)) { // Use larger padding for spells
+            drawSpell(spell);
+        }
     });
     
     // Draw all players
     Object.values(players).forEach(player => {
-        drawPlayer(player, player.id === myId);
-        drawHealthBar(player);
+        // Only draw players that are visible in the viewport
+        if (isInViewport(player.x, player.y)) {
+            // Debug check for player state - only log occasionally to avoid console spam
+            if (player.id === myId && Math.random() < 0.01) { // Only log ~1% of frames
+                console.log(`Rendering player ${player.id}: isAlive=${player.isAlive}, health=${player.health}`);
+            }
+            
+            // Always draw the player (will be drawn as ghost if isAlive is false)
+            drawPlayer(player, player.id === myId);
+            
+            // Only draw health bar for living players - strictly check isAlive
+            if (player.isAlive === true) {
+                drawHealthBar(player);
+            }
+        }
     });
+    
+    // Restore context after rendering world
+    ctx.restore();
 }
 
 function drawGrid() {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.lineWidth = 1;
     
-    // Vertical lines
-    for (let x = 0; x < canvas.width; x += 40) {
+    // Get visible grid area based on camera position
+    const startX = Math.floor(cameraX / 40) * 40;
+    const endX = Math.ceil((cameraX + CANVAS_WIDTH) / 40) * 40;
+    const startY = Math.floor(cameraY / 40) * 40;
+    const endY = Math.ceil((cameraY + CANVAS_HEIGHT) / 40) * 40;
+    
+    // Vertical lines - only draw what's visible in the camera
+    for (let x = startX; x <= endX; x += 40) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
+        ctx.lineTo(x, WORLD_HEIGHT);
         ctx.stroke();
     }
     
-    // Horizontal lines
-    for (let y = 0; y < canvas.height; y += 40) {
+    // Horizontal lines - only draw what's visible in the camera
+    for (let y = startY; y <= endY; y += 40) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
+        ctx.lineTo(WORLD_WIDTH, y);
         ctx.stroke();
     }
 }
@@ -354,10 +654,38 @@ function drawGrid() {
 function drawPlayer(player, isMe) {
     const x = player.x;
     const y = player.y;
+    const facingLeft = player.facingLeft;
+    // Explicitly check isAlive status - if isAlive is true, the player is alive regardless of health
+    // Add occasional logging for debugging player state
+    const isDead = player.isAlive === false;
+    if (isMe && player.id === myId && Math.random() < 0.01) { // Only log ~1% of frames
+        console.log(`Drawing local player: id=${player.id}, isAlive=${player.isAlive}, isDead=${isDead}`);
+    }
     
-    // Draw burning effect
-    if (player.isBurning) {
-        ctx.save();
+    // Save context to restore later
+    ctx.save();
+    
+    // Spawn protection effect - only show for living players
+    if (player.spawnProtection && !isDead) {
+        const time = Date.now();
+        const pulse = Math.sin(time * 0.01) * 0.3 + 0.7;
+        
+        // Blue protection aura
+        ctx.globalAlpha = pulse * 0.8;
+        ctx.fillStyle = '#4169E1';
+        ctx.beginPath();
+        ctx.arc(x, y, PLAYER_SIZE + 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.globalAlpha = pulse * 0.5;
+        ctx.fillStyle = '#6495ED';
+        ctx.beginPath();
+        ctx.arc(x, y, PLAYER_SIZE + 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Draw burning effect - only show for living players
+    if (player.isBurning && !isDead) {
         const time = Date.now();
         const flicker = Math.sin(time * 0.01) * 0.3 + 0.7;
         
@@ -373,52 +701,123 @@ function drawPlayer(player, isMe) {
         ctx.beginPath();
         ctx.arc(x, y, PLAYER_SIZE + 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
     }
     
-    // Draw wizard body (circle)
-    ctx.fillStyle = player.color;
-    ctx.beginPath();
-    ctx.arc(x, y, PLAYER_SIZE, 0, Math.PI * 2);
-    ctx.fill();
+    // Reset alpha
+    ctx.globalAlpha = 1;
     
-    // Add border for current player
-    if (isMe) {
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 3;
+    if (isDead) {
+        // Draw dead wizard (ghost)
+        
+        // Ghost body
+        ctx.fillStyle = 'rgba(220, 220, 220, 0.8)';
+        ctx.beginPath();
+        ctx.arc(x, y, PLAYER_SIZE - 2, 0, Math.PI, true);
+        ctx.lineTo(x - PLAYER_SIZE + 2, y + PLAYER_SIZE - 2);
+        ctx.lineTo(x - PLAYER_SIZE / 2, y + PLAYER_SIZE / 2);
+        ctx.lineTo(x, y + PLAYER_SIZE);
+        ctx.lineTo(x + PLAYER_SIZE / 2, y + PLAYER_SIZE / 2);
+        ctx.lineTo(x + PLAYER_SIZE - 2, y + PLAYER_SIZE - 2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Ghost eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(x - 5, y - 2, 3, 0, Math.PI * 2);
+        ctx.arc(x + 5, y - 2, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Ghost mouth
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y + 5, 5, 0.1 * Math.PI, 0.9 * Math.PI);
         ctx.stroke();
+        
+    } else {
+        // Draw living wizard
+        ctx.scale(facingLeft ? -1 : 1, 1);
+        const flippedX = facingLeft ? -x : x;
+        
+        // Draw wizard body (circle)
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.arc(flippedX, y, PLAYER_SIZE, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add border for current player
+        if (isMe) {
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+        }
+        
+        // Draw wizard robe bottom
+        ctx.fillStyle = player.color;
+        ctx.beginPath();
+        ctx.moveTo(flippedX - PLAYER_SIZE, y);
+        ctx.lineTo(flippedX - PLAYER_SIZE + 5, y + PLAYER_SIZE + 5);
+        ctx.lineTo(flippedX + PLAYER_SIZE - 5, y + PLAYER_SIZE + 5);
+        ctx.lineTo(flippedX + PLAYER_SIZE, y);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw wizard hat
+        ctx.fillStyle = '#4A4A4A';
+        ctx.beginPath();
+        ctx.moveTo(flippedX - 15, y - 15);
+        ctx.lineTo(flippedX, y - 35);
+        ctx.lineTo(flippedX + 15, y - 15);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Hat star
+        ctx.fillStyle = '#FFD700';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('⭐', flippedX, y - 20);
+        
+        // Draw wizard face
+        ctx.fillStyle = '#FFE4C4'; // Skin tone
+        ctx.beginPath();
+        ctx.arc(flippedX, y - 2, 10, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Eyes
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(flippedX - 4, y - 5, 2, 0, Math.PI * 2);
+        ctx.arc(flippedX + 4, y - 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Beard
+        ctx.fillStyle = '#DDDDDD';
+        ctx.beginPath();
+        ctx.moveTo(flippedX - 8, y - 2);
+        ctx.lineTo(flippedX, y + 10);
+        ctx.lineTo(flippedX + 8, y - 2);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Draw wizard staff
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(flippedX + 20, y - 10);
+        ctx.lineTo(flippedX + 20, y + 25);
+        ctx.stroke();
+        
+        // Staff orb
+        ctx.fillStyle = '#9370DB';
+        ctx.beginPath();
+        ctx.arc(flippedX + 20, y - 15, 5, 0, Math.PI * 2);
+        ctx.fill();
     }
     
-    // Draw wizard hat
-    ctx.fillStyle = '#4A4A4A';
-    ctx.beginPath();
-    ctx.moveTo(x - 15, y - 15);
-    ctx.lineTo(x, y - 35);
-    ctx.lineTo(x + 15, y - 15);
-    ctx.closePath();
-    ctx.fill();
+    ctx.restore();
     
-    // Hat star
-    ctx.fillStyle = '#FFD700';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('⭐', x, y - 20);
-    
-    // Draw wizard staff
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(x + 20, y - 10);
-    ctx.lineTo(x + 20, y + 25);
-    ctx.stroke();
-    
-    // Staff orb
-    ctx.fillStyle = '#9370DB';
-    ctx.beginPath();
-    ctx.arc(x + 20, y - 15, 5, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Player ID (for debugging)
+    // Player tag (always upright)
     if (isMe) {
         ctx.fillStyle = '#FFFFFF';
         ctx.font = '12px Arial';
@@ -428,6 +827,11 @@ function drawPlayer(player, isMe) {
 }
 
 function drawHealthBar(player) {
+    // Don't draw health bar for dead players - only check isAlive flag
+    if (player.isAlive === false) {
+        return;
+    }
+    
     const x = player.x;
     const y = player.y - PLAYER_SIZE - 20;
     const width = 40;
@@ -475,34 +879,81 @@ function castSpell(targetX, targetY) {
     
     const player = players[myId];
     
-    // Calculate direction vector
+    // Calculate direction vector from player to target
     const dx = targetX - player.x;
     const dy = targetY - player.y;
     const length = Math.sqrt(dx * dx + dy * dy);
     
-    // Normalize direction and extend to screen width
+    if (length === 0) return; // Prevent division by zero
+    
+    // Normalize direction vector
     const normalizedDx = dx / length;
     const normalizedDy = dy / length;
     
-    // Calculate target point at screen edge
-    const screenDistance = canvas.height; // Travel about screen height distance
-    const finalTargetX = player.x + normalizedDx * screenDistance;
-    const finalTargetY = player.y + normalizedDy * screenDistance;
+    // Calculate angle in radians, from -PI to PI
+    const angle = Math.atan2(normalizedDy, normalizedDx);
     
+    // Set spell starting point at the player's position
+    const spellStartX = player.x;
+    const spellStartY = player.y;
+    
+    // Use fixed target distance to ensure consistent behavior
+    const targetDistance = 1000;
+    const finalTargetX = player.x + normalizedDx * targetDistance;
+    const finalTargetY = player.y + normalizedDy * targetDistance;
+    
+    // Debug logging
+    console.log('Casting spell:', {
+        from: { x: player.x, y: player.y },
+        direction: { dx: normalizedDx, dy: normalizedDy },
+        angle: angle * (180 / Math.PI), // Convert to degrees for logging
+        target: { x: finalTargetX, y: finalTargetY }
+    });
+    
+    // Update player facing direction based on spell direction
+    const facingLeft = normalizedDx < 0;
+    if (player.facingLeft !== facingLeft) {
+        player.facingLeft = facingLeft;
+        socket.emit('playerMovement', {
+            x: player.x,
+            y: player.y,
+            facingLeft: facingLeft
+        });
+    }
+    
+    // Send spell cast event to server with precise coordinates and angle
     socket.emit('castSpell', {
-        x: player.x,
-        y: player.y,
+        x: spellStartX,
+        y: spellStartY,
         targetX: finalTargetX,
-        targetY: finalTargetY
+        targetY: finalTargetY,
+        angle: angle, // Store exact angle for precise movement
+        directionX: normalizedDx, // Store normalized direction for consistency
+        directionY: normalizedDy
     });
 }
 
 function drawSpell(spell) {
     if (!spell) return;
     
+    ctx.save();
+    
+    // Get spell direction angle
+    let angle;
+    if (spell.angle !== undefined) {
+        angle = spell.angle;
+    } else if (spell.trail && spell.trail.length >= 2) {
+        // Calculate angle from last two trail points
+        const last = spell.trail[spell.trail.length-1];
+        const prev = spell.trail[spell.trail.length-2];
+        angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+    } else {
+        // Default to right direction if we can't determine angle
+        angle = 0;
+    }
+    
     // Draw fireball trail
     if (spell.trail && spell.trail.length > 0) {
-        ctx.save();
         for (let i = 0; i < spell.trail.length; i++) {
             const trailPoint = spell.trail[i];
             const alpha = (i + 1) / spell.trail.length * 0.6; // Fade effect
@@ -514,28 +965,32 @@ function drawSpell(spell) {
             ctx.arc(trailPoint.x, trailPoint.y, size, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.restore();
     }
     
-    // Draw fireball
-    ctx.save();
+    // Reset alpha
+    ctx.globalAlpha = 1;
     
-    // Outer fire
+    // Translate to spell position and rotate
+    ctx.translate(spell.x, spell.y);
+    ctx.rotate(angle);
+    
+    // Draw elongated fireball shape
+    // Outer fire (elongated)
     ctx.fillStyle = '#FF4500';
     ctx.beginPath();
-    ctx.arc(spell.x, spell.y, SPELL_SIZE + 2, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, SPELL_SIZE + 5, SPELL_SIZE, 0, 0, Math.PI * 2);
     ctx.fill();
     
-    // Inner fire
+    // Inner fire (elongated)
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
-    ctx.arc(spell.x, spell.y, SPELL_SIZE, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, SPELL_SIZE + 2, SPELL_SIZE - 2, 0, 0, Math.PI * 2);
     ctx.fill();
     
     // Fire core
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
-    ctx.arc(spell.x, spell.y, SPELL_SIZE / 2, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, SPELL_SIZE / 2, SPELL_SIZE / 3, 0, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.restore();
@@ -547,35 +1002,76 @@ function updateSpell(spell) {
     const now = Date.now();
     const elapsed = (now - spell.createdAt) / 1000;
     
-    // Calculate movement
-    const dx = spell.targetX - spell.x;
-    const dy = spell.targetY - spell.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Use stored direction if available, otherwise calculate it
+    let dx, dy;
     
-    if (distance < 5) {
-        // Spell reached target, remove it
-        delete spells[spell.id];
-        return;
+    if (spell.directionX !== undefined && spell.directionY !== undefined) {
+        // Use the stored normalized direction vectors
+        dx = spell.directionX;
+        dy = spell.directionY;
+    } else if (spell.angle !== undefined) {
+        // Use the stored angle if direction vectors aren't available
+        dx = Math.cos(spell.angle);
+        dy = Math.sin(spell.angle);
+    } else {
+        // Last resort: calculate direction from current position to target
+        const deltaX = spell.targetX - spell.x;
+        const deltaY = spell.targetY - spell.y;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        
+        if (distance < 5) {
+            // Spell reached target, remove it
+            delete spells[spell.id];
+            return;
+        }
+        
+        dx = deltaX / distance;
+        dy = deltaY / distance;
     }
     
-    // Move spell
+    // Maintain trail history for visual effects
+    if (!spell.trail) {
+        spell.trail = [];
+    }
+    
+    // Keep trail at fixed length
+    if (spell.trail.length > 10) {
+        spell.trail.shift();
+    }
+    spell.trail.push({x: spell.x, y: spell.y});
+    
+    // Move spell with fixed speed
     const moveDistance = spell.speed * (1/60); // Assuming 60 FPS
-    spell.x += (dx / distance) * moveDistance;
-    spell.y += (dy / distance) * moveDistance;
+    spell.x += dx * moveDistance;
+    spell.y += dy * moveDistance;
+    
+    // Debug log occasionally
+    if (Math.random() < 0.01) {
+        console.log('Spell movement:', {
+            id: spell.id,
+            pos: { x: spell.x, y: spell.y },
+            direction: { dx, dy },
+            angle: spell.angle * (180 / Math.PI)
+        });
+    }
     
     // Check collision with players
     Object.values(players).forEach(player => {
-        if (player.id !== spell.casterId) {
+        // Skip caster and explicitly check isAlive status
+        // A player is only alive if isAlive is exactly true
+        if (player.id !== spell.casterId && player.isAlive === true) {
             const playerDx = player.x - spell.x;
             const playerDy = player.y - spell.y;
             const playerDistance = Math.sqrt(playerDx * playerDx + playerDy * playerDy);
             
             if (playerDistance < PLAYER_SIZE + SPELL_SIZE) {
-                // Hit detected
+                // Register hit on this living player
                 socket.emit('spellHit', {
                     spellId: spell.id,
                     targetId: player.id
                 });
+                
+                // Remove the spell when it hits any player
                 delete spells[spell.id];
             }
         }
@@ -599,12 +1095,17 @@ function updateSpells() {
             spell.trail = [];
         }
         
-        // Add current position to trail
-        spell.trail.push({ x: spell.x, y: spell.y });
-        
-        // Limit trail length
-        if (spell.trail.length > 8) {
-            spell.trail.shift();
+        // Add current position to trail only if it's moved enough
+        if (spell.trail.length === 0 || 
+            (spell.trail.length > 0 && 
+             (Math.abs(spell.trail[spell.trail.length - 1].x - spell.x) > 5 || 
+              Math.abs(spell.trail[spell.trail.length - 1].y - spell.y) > 5))) {
+            spell.trail.push({ x: spell.x, y: spell.y });
+            
+            // Limit trail length
+            if (spell.trail.length > 8) {
+                spell.trail.shift();
+            }
         }
         
         // Calculate movement
@@ -623,8 +1124,13 @@ function updateSpells() {
         spell.x += (dx / distance) * moveDistance;
         spell.y += (dy / distance) * moveDistance;
         
+        // Ensure spell stays within world boundaries
+        spell.x = Math.max(0, Math.min(WORLD_WIDTH, spell.x));
+        spell.y = Math.max(0, Math.min(WORLD_HEIGHT, spell.y));
+        
         // Check collision with players
         Object.values(players).forEach(player => {
+            // Only process hits on living players that aren't the caster
             if (player.id !== spell.casterId && player.isAlive !== false) {
                 const playerDx = player.x - spell.x;
                 const playerDy = player.y - spell.y;
@@ -638,12 +1144,15 @@ function updateSpells() {
                     });
                     delete spells[spell.id];
                 }
+            } else if (player.id !== spell.casterId && player.isAlive === false) {
+                // If player is dead, log this but don't process any hit
+                console.log('Spell passed through dead player:', player.id);
             }
         });
         
-        // Remove spell after 5 seconds or if it goes off screen
-        if (elapsed > 5 || spell.x < -50 || spell.x > canvas.width + 50 || 
-            spell.y < -50 || spell.y > canvas.height + 50) {
+        // Remove spell after 5 seconds or if it goes off world boundaries
+        if (elapsed > 5 || spell.x < -50 || spell.x > WORLD_WIDTH + 50 || 
+            spell.y < -50 || spell.y > WORLD_HEIGHT + 50) {
             delete spells[spell.id];
         }
     });
@@ -659,9 +1168,32 @@ function renderMinimap() {
     minimapCtx.fillStyle = 'rgba(0, 50, 100, 0.8)';
     minimapCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
     
-    // Scale factors
-    const scaleX = minimapCanvas.width / canvas.width;
-    const scaleY = minimapCanvas.height / canvas.height;
+    // Scale factors for entire world
+    const scaleX = minimapCanvas.width / WORLD_WIDTH;
+    const scaleY = minimapCanvas.height / WORLD_HEIGHT;
+    
+    // Draw world boundaries markers on minimap
+    minimapCtx.fillStyle = '#FF0000';
+    minimapCtx.fillRect(0, 0, 5, 5);
+    
+    minimapCtx.fillStyle = '#00FF00';
+    minimapCtx.fillRect(minimapCanvas.width - 5, 0, 5, 5);
+    
+    minimapCtx.fillStyle = '#0000FF';
+    minimapCtx.fillRect(0, minimapCanvas.height - 5, 5, 5);
+    
+    minimapCtx.fillStyle = '#FFFF00';
+    minimapCtx.fillRect(minimapCanvas.width - 5, minimapCanvas.height - 5, 5, 5);
+    
+    // Draw viewport rectangle on minimap
+    minimapCtx.strokeStyle = '#FFFFFF';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.strokeRect(
+        cameraX * scaleX,
+        cameraY * scaleY,
+        CANVAS_WIDTH * scaleX,
+        CANVAS_HEIGHT * scaleY
+    );
     
     // Draw players on minimap
     Object.values(players).forEach(player => {
@@ -670,7 +1202,7 @@ function renderMinimap() {
         
         minimapCtx.fillStyle = player.id === myId ? '#FFD700' : player.color;
         minimapCtx.beginPath();
-        minimapCtx.arc(x, y, 3, 0, Math.PI * 2);
+        minimapCtx.arc(x, y, 2, 0, Math.PI * 2);
         minimapCtx.fill();
         
         // Add border for current player
@@ -709,7 +1241,8 @@ function showDeathModal() {
         } else {
             clearInterval(countdown);
             deathModal.style.display = 'none';
-            isDead = false;
+            // isDead is now set to false when the playerRespawned event is received
+            // This ensures we don't restore control to the player until the server confirms respawn
         }
     }, 1000);
 }
@@ -748,6 +1281,87 @@ function updateLeaderboard() {
 function updatePlayerCount() {
     const count = Object.keys(players).length;
     document.getElementById('playerCount').textContent = `Players Online: ${count}`;
+}
+
+function updateCamera(immediate = false) {
+    if (myId && players[myId]) {
+        // Calculate camera position to center on player
+        const player = players[myId];
+        
+        // Smoothly move camera to player
+        const targetX = player.x - CANVAS_WIDTH / 2;
+        const targetY = player.y - CANVAS_HEIGHT / 2;
+        
+        if (immediate) {
+            // Set camera position immediately (no smoothing)
+            cameraX = targetX;
+            cameraY = targetY;
+        } else {
+            // Apply some smoothing (lerp) for camera movement
+            cameraX += (targetX - cameraX) * 0.1;
+            cameraY += (targetY - cameraY) * 0.1;
+        }
+        
+        // Clamp camera to world boundaries
+        cameraX = Math.max(0, Math.min(cameraX, WORLD_WIDTH - CANVAS_WIDTH));
+        cameraY = Math.max(0, Math.min(cameraY, WORLD_HEIGHT - CANVAS_HEIGHT));
+    }
+}
+
+function isInViewport(x, y, extraPadding = 0) {
+    // Ensure all coordinates are properly calculated with respect to the world boundaries
+    return (
+        x >= cameraX - VIEWPORT_PADDING - extraPadding &&
+        x <= cameraX + CANVAS_WIDTH + VIEWPORT_PADDING + extraPadding &&
+        y >= cameraY - VIEWPORT_PADDING - extraPadding &&
+        y <= cameraY + CANVAS_HEIGHT + VIEWPORT_PADDING + extraPadding
+    );
+}
+
+function drawWorldBoundaries() {
+    // Draw a border around the edge of the world
+    ctx.strokeStyle = '#FF4500';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    
+    // Draw some markers at the corners for orientation
+    const markerSize = 30;
+    
+    // Top-left corner
+    ctx.fillStyle = '#FF0000';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(markerSize * 2, 0);
+    ctx.lineTo(0, markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Top-right corner
+    ctx.fillStyle = '#00FF00';
+    ctx.beginPath();
+    ctx.moveTo(WORLD_WIDTH, 0);
+    ctx.lineTo(WORLD_WIDTH - markerSize * 2, 0);
+    ctx.lineTo(WORLD_WIDTH, markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Bottom-left corner
+    ctx.fillStyle = '#0000FF';
+    ctx.beginPath();
+    ctx.moveTo(0, WORLD_HEIGHT);
+    ctx.lineTo(markerSize * 2, WORLD_HEIGHT);
+    ctx.lineTo(0, WORLD_HEIGHT - markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Bottom-right corner
+    ctx.fillStyle = '#FFFF00';
+    ctx.beginPath();
+    ctx.moveTo(WORLD_WIDTH, WORLD_HEIGHT);
+    ctx.lineTo(WORLD_WIDTH - markerSize * 2, WORLD_HEIGHT);
+    ctx.lineTo(WORLD_WIDTH, WORLD_HEIGHT - markerSize * 2);
+    ctx.closePath();
+    ctx.fill();
 }
 
 // Start the game loop

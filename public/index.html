@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cast Arena - Multiplayer Wizard Battle</title>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAMPSURBVFiFvddLqFVVHMfxz7mXbkUXNAspMkrDIIgokkAiGkT0ICuJHjRQImoQNokKmjQIbNQkCgJpYBG9yKQnEQQRlVIURtEDoweRFZXYg27ldvS/g7XX2Xuf+zz3Hmv0h3PYe63/f/3X4/9fa51GYQsxgjU4hh34DvvwIz7Bd7gBF5RtptV0HMIu3IdzK2w7MRvzsBD3YxA7saO0m9GZ/RjuxOv4B+/iGpyF6QX7UxnKv5+JH/A3duMunDLBfXO34CfcgbfxF17E7DG0GhuFmxdxHN/iQZw0BXYc3UAU9iqeqNpI1XkRBb6Nb/EwZmVe7JzIeBNL8DQ+w1W5w3xgweGxjHegqR9PYg0W4zfsNRLz0TSMBomWPIkwLNmFi/E+FuXz32QlXovTcWRkXe5oGYLLcXXmZe8K+zaSFnhRoqnF8XM+kGT9ghf8+xn+iRW4HlfW2GZXNZ7HzATbsAR0IEshj6FBE4uy37ViOJqYhzuxt0K8B3PwGP7EYRxXHUIzGoiA5KZiMs13jzTOxdsYymK5TI9HslmlDrmTnaX7BrblTr8qDEtGu9lmvkYLwreBg7gc9+AQ/sIvWI8rKrrp2YGGbH8EnmgJSudpWJuFal+2fQ6XljrT+zMymgOtAOfOm9ibRfejbD+CD/HLBPxGIYcSUVNF5JG0AHW0d5Xa9+JonvdVH7iKP4VeGHWSzWadYw38kRi6rie2WRwUWA7sShSytekDz0hscUQiwXGSmtsr8unIpyNStPNu5gO7EYeZkwMHCrpt7ScwY5IEPGvotEGKp9U97DMrknhRR38gL6auO8Cb4Xvy4jjbM4AYGsSHcGakRfYe7sMNCdt2LCmjAe9IMI9fSp2NVvCi8/3AwbQPFE7eS3y2eapGPHcLyVYXZYcD0zIWSkLpZ/hq8FE7xtIhL2I5nuuLhApqFXqtl3EzHscZ2VDRSEzJLnEazsb1eCRx9xg+mSzxIj2t8fJ8cQe+wT34UIrbQzgiH8g3SFHgESl4Xj+VxCdS/wcXn8w7TFeZ4AAAAABJRU5ErkJggg==" sizes="32x32">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -44,6 +46,7 @@
         <div class="modal-content death-modal">
             <h2>💀 You Died!</h2>
             <p>Respawning in <span id="respawnTimer">3</span> seconds...</p>
+            <p class="respawn-note">You'll respawn at a random location with 2 seconds of protection!</p>
         </div>
     </div>
 
