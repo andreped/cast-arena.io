@@ -134,23 +134,74 @@ export class SpriteSystem {
             ctx.fillRect(centerX + x, centerY + y, size, size);
         };
 
-        // Hat (dark gray/black) - same for all directions
-        pixel(-6, -18, '#2C2C2C', 2);
-        pixel(-4, -18, '#2C2C2C', 2);
-        pixel(-2, -18, '#2C2C2C', 2);
-        pixel(0, -18, '#2C2C2C', 2);
-        pixel(2, -18, '#2C2C2C', 2);
-        pixel(4, -18, '#2C2C2C', 2);
+        // Flowing hair (will be customizable per player) - shown around the hat edges
+        const hairColor = '#8B4513'; // Default brown, will be overridden with player color
         
-        pixel(-4, -16, '#2C2C2C', 2);
-        pixel(-2, -16, '#2C2C2C', 2);
-        pixel(0, -16, '#2C2C2C', 2);
-        pixel(2, -16, '#2C2C2C', 2);
+        // Hair flowing from sides and back
+        if (pose === 'back') {
+            // More hair visible from behind
+            pixel(-8, -16, hairColor);
+            pixel(-6, -16, hairColor);
+            pixel(-7, -14, hairColor);
+            pixel(-5, -14, hairColor);
+            pixel(-8, -12, hairColor);
+            pixel(-6, -12, hairColor);
+            pixel(4, -16, hairColor);
+            pixel(6, -16, hairColor);
+            pixel(5, -14, hairColor);
+            pixel(7, -14, hairColor);
+            pixel(6, -12, hairColor);
+            pixel(8, -12, hairColor);
+        } else {
+            // Hair visible from sides
+            pixel(-6, -16, hairColor);
+            pixel(-5, -14, hairColor);
+            pixel(-6, -12, hairColor);
+            pixel(4, -16, hairColor);
+            pixel(5, -14, hairColor);
+            pixel(6, -12, hairColor);
+        }
+
+        // Wizard hat (customizable color with bright border)
+        const hatColor = '#4A0E4E'; // Default purple, will be overridden with player color
+        const hatBorder = '#FFD700'; // Bright gold border for visibility
         
-        pixel(-2, -14, '#2C2C2C', 2);
-        pixel(0, -14, '#2C2C2C', 2);
+        // Hat main body
+        pixel(-6, -18, hatColor, 2);
+        pixel(-4, -18, hatColor, 2);
+        pixel(-2, -18, hatColor, 2);
+        pixel(0, -18, hatColor, 2);
+        pixel(2, -18, hatColor, 2);
+        pixel(4, -18, hatColor, 2);
         
-        // Hat star
+        pixel(-4, -16, hatColor, 2);
+        pixel(-2, -16, hatColor, 2);
+        pixel(0, -16, hatColor, 2);
+        pixel(2, -16, hatColor, 2);
+        
+        pixel(-2, -14, hatColor, 2);
+        pixel(0, -14, hatColor, 2);
+        
+        // Hat border/trim (bright gold for visibility)
+        pixel(-7, -17, hatBorder);
+        pixel(-5, -17, hatBorder);
+        pixel(-3, -17, hatBorder);
+        pixel(-1, -17, hatBorder);
+        pixel(1, -17, hatBorder);
+        pixel(3, -17, hatBorder);
+        pixel(5, -17, hatBorder);
+        
+        pixel(-5, -15, hatBorder);
+        pixel(-3, -15, hatBorder);
+        pixel(-1, -15, hatBorder);
+        pixel(1, -15, hatBorder);
+        pixel(3, -15, hatBorder);
+        
+        pixel(-3, -13, hatBorder);
+        pixel(-1, -13, hatBorder);
+        pixel(1, -13, hatBorder);
+
+        // Magical hat star/emblem (always bright gold)
         pixel(-1, -15, '#FFD700');
         pixel(0, -16, '#FFD700');
         pixel(1, -15, '#FFD700');
@@ -430,13 +481,35 @@ export class SpriteSystem {
         const g = parseInt(hex.substr(2, 2), 16);
         const b = parseInt(hex.substr(4, 2), 16);
         
-        // Replace blue robe color with player color
+        // Create darker version of player color for hat
+        const hatR = Math.max(0, Math.floor(r * 0.7));
+        const hatG = Math.max(0, Math.floor(g * 0.7));
+        const hatB = Math.max(0, Math.floor(b * 0.7));
+        
+        // Create different hue for hair (shift towards brown/orange)
+        const hairR = Math.min(255, Math.floor(r * 0.8 + 50));
+        const hairG = Math.min(255, Math.floor(g * 0.6 + 30));
+        const hairB = Math.max(0, Math.floor(b * 0.4));
+        
+        // Replace default colors with player colors
         for (let i = 0; i < data.length; i += 4) {
-            // Check if this pixel is the default robe color
+            // Replace blue robe color with player color
             if (data[i] === 65 && data[i + 1] === 105 && data[i + 2] === 225) { // #4169E1
                 data[i] = r;
                 data[i + 1] = g;
                 data[i + 2] = b;
+            }
+            // Replace default hat color with darker player color
+            else if (data[i] === 74 && data[i + 1] === 14 && data[i + 2] === 78) { // #4A0E4E
+                data[i] = hatR;
+                data[i + 1] = hatG;
+                data[i + 2] = hatB;
+            }
+            // Replace default hair color with player-themed hair color
+            else if (data[i] === 139 && data[i + 1] === 69 && data[i + 2] === 19) { // #8B4513
+                data[i] = hairR;
+                data[i + 1] = hairG;
+                data[i + 2] = hairB;
             }
         }
         
