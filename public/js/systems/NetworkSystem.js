@@ -35,6 +35,16 @@ export class NetworkSystem {
         this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
     }
 
+    // Add cleanup method
+    destroy() {
+        if (this.socket) {
+            this.socket.removeAllListeners();
+            this.socket.disconnect();
+            this.socket = null;
+        }
+        this.game = null;
+    }
+
     handleCurrentPlayers(serverPlayers) {
         Object.entries(serverPlayers).forEach(([id, data]) => {
             this.game.players.set(id, new Player(id, data));

@@ -14,6 +14,7 @@ export class Spell {
         this.damage = GAME_CONFIG.spell.damage;
         this.createdAt = Date.now();
         this.trail = [];
+        this.shouldRemove = false; // Flag to track if spell should be removed
         
         // Store normalized direction vectors for consistent movement
         const dx = this.targetX - this.x;
@@ -23,19 +24,10 @@ export class Spell {
         this.directionY = dy / length;
     }
 
-    update(dt, players, socket) {
-        // Debug logging for Safari
-        if (Math.random() < 0.01) { // Log only 1% of updates to avoid spam
-            console.log('Spell update:', {
-                id: this.id,
-                position: { x: this.x, y: this.y },
-                players: Array.from(players).map(([id, p]) => ({
-                    id,
-                    pos: { x: p.x, y: p.y },
-                    alive: p.isAlive,
-                    protected: p.spawnProtection
-                }))
-            });
+    update(dt, players, socket, game) {
+        // Early return if spell is already marked for removal
+        if (this.shouldRemove) {
+            return true;
         }
 
         // Add current position to trail
@@ -49,30 +41,46 @@ export class Spell {
         const newX = this.x + this.directionX * moveDistance;
         const newY = this.y + this.directionY * moveDistance;
 
-        // Check for wall collision along the trajectory
-        // Access the game instance through a global reference or pass it as parameter
-        if (window.gameInstance && window.gameInstance.checkWallLineCollision) {
-            const wallHit = window.gameInstance.checkWallLineCollision(this.x, this.y, newX, newY);
-            if (wallHit) {
-                return true; // Spell hits wall and should be removed
+        // FIRST: Check if the direct path from current position to new position hits a wall
+        if (game && game.checkWallLineCollision) {
+            const directWallHit = game.checkWallLineCollision(this.x, this.y, newX, newY);
+            if (directWallHit) {
+                // Wall collision detected - create explosion and remove spell immediately
+                if (game.addExplosion) {
+                    game.addExplosion(this.x, this.y, 'wall');
+                }
+                this.shouldRemove = true;
+                return true;
             }
         }
 
-        // Check collisions at intermediate points
-        const steps = Math.max(1, Math.ceil(moveDistance / (GAME_CONFIG.player.size / 2)));
+        // SECOND: Check if the new position itself would be inside a wall
+        if (game && game.checkWallCollision) {
+            const positionBlocked = game.checkWallCollision(newX, newY, GAME_CONFIG.spell.size / 2);
+            if (positionBlocked) {
+                if (game.addExplosion) {
+                    game.addExplosion(this.x, this.y, 'wall');
+                }
+                this.shouldRemove = true;
+                return true;
+            }
+        }
+
+        // THIRD: Only if no wall collision, check for player collisions along the path
+        // Use small steps to ensure we don't miss any players
+        const steps = Math.max(3, Math.ceil(moveDistance / 10)); // Small 10px steps
         const stepX = (newX - this.x) / steps;
         const stepY = (newY - this.y) / steps;
 
         for (let i = 1; i <= steps; i++) {
             const checkX = this.x + stepX * i;
             const checkY = this.y + stepY * i;
-
-            // Check collision with each player
-            // Use Array.from to ensure cross-browser compatibility
-            Array.from(players).forEach(([playerId, player]) => {
+            
+            // IMPORTANT: Before checking players, verify no wall is between spell and player
+            for (const [playerId, player] of players) {
                 // Skip if it's the caster or if player is dead or has spawn protection
                 if (playerId === this.casterId || !player.isAlive || player.spawnProtection) {
-                    return; // using return in forEach instead of continue
+                    continue;
                 }
 
                 // Calculate squared distance (faster than using Math.sqrt)
@@ -83,7 +91,24 @@ export class Spell {
                                           (GAME_CONFIG.player.size + GAME_CONFIG.spell.size);
 
                 if (distanceSquared <= hitThresholdSquared) {
-                    // Hit detected! Send hit event to server
+                    // BEFORE sending hit to server, double-check no wall between spell and player
+                    if (game && game.checkWallLineCollision) {
+                        const wallBetweenSpellAndPlayer = game.checkWallLineCollision(
+                            this.x, this.y, 
+                            player.x, player.y
+                        );
+                        
+                        if (wallBetweenSpellAndPlayer) {
+                            // There's a wall between spell and player - treat as wall hit instead
+                            if (game.addExplosion) {
+                                game.addExplosion(this.x, this.y, 'wall');
+                            }
+                            this.shouldRemove = true;
+                            return true;
+                        }
+                    }
+                    
+                    // Player hit detected and no wall blocking! Send hit event to server
                     if (socket) {
                         socket.emit('spellHit', {
                             spellId: this.id,
@@ -92,24 +117,34 @@ export class Spell {
                             casterId: this.casterId
                         });
                     }
-                    this.shouldRemove = true; // Mark for removal instead of direct return
+                    
+                    // Create explosion effect for player hit
+                    if (game && game.addExplosion) {
+                        game.addExplosion(checkX, checkY, 'hit');
+                    }
+                    
+                    this.shouldRemove = true;
+                    return true;
                 }
-            });
-            
-            if (this.shouldRemove) {
-                return true;
             }
         }
 
-        // Update position if no collision occurred
+        // FOURTH: Only update position if no collisions occurred
         this.x = newX;
         this.y = newY;
 
         // Check if spell is out of bounds or too old
         const age = (Date.now() - this.createdAt) / 1000;
-        return age > 3 || 
+        const outOfBounds = age > 3 || 
                this.x < 0 || this.x > GAME_CONFIG.world.width ||
                this.y < 0 || this.y > GAME_CONFIG.world.height;
+               
+        if (outOfBounds) {
+            this.shouldRemove = true;
+            return true;
+        }
+
+        return false;
     }
 
     isInViewport(cameraX, cameraY) {

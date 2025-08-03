@@ -97,6 +97,28 @@ class SocketManager {
             socketId: socket.id
         });
 
+        // CRITICAL: Server-side wall collision validation
+        // Check if there's a wall between the spell position and the target
+        if (spell && target && position) {
+            const wallBetween = this.gameState.checkWallLineCollision(
+                spell.x, spell.y, 
+                target.x, target.y
+            );
+            
+            if (wallBetween) {
+                console.log('Server detected wall between spell and target - rejecting hit');
+                // Remove spell but don't apply damage
+                this.gameState.removeSpell(spellId);
+                // Emit explosion at wall instead
+                this.io.emit('spellExplosion', {
+                    x: spell.x,
+                    y: spell.y,
+                    type: 'wall'
+                });
+                return;
+            }
+        }
+
         // Always emit explosion at hit position, even if validation fails
         if (position && target) {
             this.io.emit('spellExplosion', {

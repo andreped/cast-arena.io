@@ -34,7 +34,28 @@ const gameLoop = () => {
 };
 
 // Start game loop (run every 100ms for better responsiveness)
-setInterval(gameLoop, 100);
+const gameLoopInterval = setInterval(gameLoop, 100);
+
+// Cleanup function for graceful shutdown
+const cleanup = () => {
+    console.log('Shutting down server...');
+    
+    // Clear intervals
+    if (gameLoopInterval) {
+        clearInterval(gameLoopInterval);
+    }
+    
+    // Cleanup game systems
+    if (burnSystem && burnSystem.destroy) {
+        burnSystem.destroy();
+    }
+    
+    process.exit(0);
+};
+
+// Handle graceful shutdown
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 
 // Start server
 const PORT = process.env.PORT || 3000;
