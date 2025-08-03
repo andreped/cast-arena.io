@@ -11,12 +11,14 @@ export const GAME_CONFIG = {
     player: {
         speed: 3,
         size: 20,
-        maxHealth: 100
+        maxHealth: 100,
+        maxMana: 50
     },
     spell: {
         size: 8,
         speed: 200,
-        damage: 20
+        damage: 20,
+        manaCost: 5
     },
     mobile: {
         fireDelay: 300

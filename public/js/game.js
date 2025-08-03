@@ -92,6 +92,10 @@ export class Game {
         this.updateCamera();
         this.updateSpells(deltaTime);
         this.updateExplosions(deltaTime);
+        
+        // Update UI with current player stats
+        this.ui.updatePlayerStats();
+        this.ui.updateActiveEffects();
     }
 
     updateCamera(instant = false) {

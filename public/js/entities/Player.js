@@ -8,6 +8,8 @@ export class Player {
         this.color = data.color || '#FFFFFF';
         this.health = data.health || GAME_CONFIG.player.maxHealth;
         this.maxHealth = GAME_CONFIG.player.maxHealth;
+        this.mana = data.mana || GAME_CONFIG.player.maxMana;
+        this.maxMana = GAME_CONFIG.player.maxMana;
         this.kills = data.kills || 0;
         this.isBurning = data.isBurning || false;
         this.burnEndTime = data.burnEndTime || 0;

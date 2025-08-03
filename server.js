@@ -31,6 +31,9 @@ const gameLoop = () => {
     // Send player updates to synchronize speed buffs and other dynamic data
     const currentState = gameState.getCurrentState();
     io.emit('gameStateUpdate', currentState);
+    
+    // Send mana updates for all players (every few loops to reduce network traffic)
+    socketManager.broadcastManaUpdates();
 };
 
 // Start game loop (run every 100ms for better responsiveness)

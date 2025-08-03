@@ -196,6 +196,93 @@ h1 {
     padding: 8px;
 }
 
+/* Player Stats UI */
+#playerStats {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #34495e;
+    border-radius: 6px;
+    padding: 6px;
+    min-width: 120px;
+}
+
+/* Active Effects Display */
+#activeEffects {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #34495e;
+    border-radius: 6px;
+    padding: 6px;
+    min-width: 150px;
+    display: none;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.stat-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    gap: 6px;
+}
+
+.stat-bar:last-child {
+    margin-bottom: 0;
+}
+
+.stat-icon {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+}
+
+.bar-container {
+    position: relative;
+    width: 80px;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #555;
+    border-radius: 5px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.bar-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.health-fill {
+    background: linear-gradient(90deg, #4CAF50, #66BB6A);
+}
+
+.mana-fill {
+    background: linear-gradient(90deg, #2196F3, #42A5F5);
+}
+
+/* Custom Tooltips */
+.custom-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 1001;
+    display: none;
+    white-space: nowrap;
+    border: 1px solid #555;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
 #minimapCanvas {
     display: block;
     border: 1px solid #555;
@@ -335,6 +422,31 @@ h1 {
     #minimap {
         top: 5px;
         right: 5px;
+    }
+    
+    #playerStats {
+        top: 5px;
+        left: 5px;
+        min-width: 100px;
+        padding: 4px;
+    }
+    
+    #activeEffects {
+        bottom: 170px;
+        left: 5px;
+        min-width: 120px;
+        padding: 4px;
+        font-size: 10px;
+    }
+    
+    .bar-container {
+        width: 60px;
+        height: 8px;
+    }
+    
+    .stat-icon {
+        font-size: 12px;
+        width: 14px;
     }
 }
 

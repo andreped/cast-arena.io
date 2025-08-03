@@ -537,7 +537,9 @@ export class RenderSystem {
         this.game.players.forEach(player => {
             if (player.isInViewport(this.game.camera.x, this.game.camera.y)) {
                 this.drawPlayer(player, player.id === this.game.myId);
-                if (player.isAlive) {
+                // Only show health bars above other players, not the local player
+                // Mana is private - only show for local player in UI
+                if (player.isAlive && player.id !== this.game.myId) {
                     this.drawHealthBar(player);
                 }
             }
@@ -769,6 +771,36 @@ export class RenderSystem {
         this.ctx.font = '12px Arial';
         this.ctx.textAlign = 'left';
         this.ctx.fillText(`💀${player.kills}`, x + width/2 + 5, y + height);
+    }
+
+    drawManaBar(player) {
+        const x = player.x;
+        const y = player.y - GAME_CONFIG.player.size - 30; // Below health bar
+        const width = 40;
+        const height = 4;
+
+        // Background
+        this.ctx.fillStyle = '#222';
+        this.ctx.fillRect(x - width/2, y, width, height);
+
+        // Mana fill
+        const manaPercent = player.mana / player.maxMana;
+        const manaWidth = width * manaPercent;
+
+        this.ctx.fillStyle = manaPercent > 0.6 ? '#2196F3' : 
+                            manaPercent > 0.3 ? '#FF9800' : '#F44336';
+        this.ctx.fillRect(x - width/2, y, manaWidth, height);
+
+        // Border
+        this.ctx.strokeStyle = '#FFF';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(x - width/2, y, width, height);
+
+        // Mana text
+        this.ctx.fillStyle = '#FFF';
+        this.ctx.font = '8px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText(`${Math.ceil(player.mana)}`, x, y - 1);
     }
 
     renderMinimap() {

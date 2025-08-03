@@ -34,6 +34,9 @@ class SocketManager {
         const respawnData = player.respawn(safePosition);
         this.emitRespawnEvents(respawnData);
         
+        // Send initial mana state
+        this.emitManaUpdate(player);
+        
         this.setupRespawnImmunity(socket.id);
     }
 
@@ -96,6 +99,14 @@ class SocketManager {
         
         if (!player || !player.isAlive) return;
 
+        // Check if player has enough mana
+        const gameConfig = require('../config/gameConfig');
+        if (!player.consumeMana(gameConfig.spells.fireball.manaCost)) {
+            // Not enough mana - send mana update to client
+            this.emitManaUpdate(player);
+            return;
+        }
+
         const spell = this.gameState.castSpell(
             socket.id,
             spellData.x,
@@ -106,6 +117,9 @@ class SocketManager {
         );
 
         this.io.emit('spellCast', spell.toJSON());
+        
+        // Send mana update after spell cast
+        this.emitManaUpdate(player);
     }
 
     handleSpellHit(socket, hitData) {
@@ -259,6 +273,23 @@ class SocketManager {
             isBurning: player.isBurning,
             burnEndTime: player.burnEndTime
         });
+    }
+
+    emitManaUpdate(player) {
+        this.io.emit('manaUpdate', {
+            id: player.id,
+            mana: player.mana,
+            maxMana: player.maxMana
+        });
+    }
+
+    broadcastManaUpdates() {
+        // Send mana updates for all players
+        for (const [id, player] of this.gameState.players) {
+            if (player.isAlive) {
+                this.emitManaUpdate(player);
+            }
+        }
     }
 
     checkItemPickupsForPlayer(playerId, player) {
