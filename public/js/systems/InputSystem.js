@@ -232,6 +232,9 @@ export class InputSystem {
         const player = this.game.players.get(this.game.myId);
         const targetDistance = 1000;
 
+        // Trigger casting animation
+        this.game.renderer.spriteSystem.createCastAnimation(this.game.myId);
+
         this.game.network.castSpell({
             x: player.x,
             y: player.y,

@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { SpriteSystem } from './SpriteSystem.js';
 
 export class RenderSystem {
     constructor(game) {
@@ -6,6 +7,14 @@ export class RenderSystem {
         this.ctx = game.canvas.getContext('2d');
         this.minimapCtx = game.minimapCanvas.getContext('2d');
         this.floorCache = null;
+        this.spriteSystem = new SpriteSystem();
+        
+        // Set up canvas for pixel-perfect rendering
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.webkitImageSmoothingEnabled = false;
+        this.ctx.mozImageSmoothingEnabled = false;
+        this.ctx.msImageSmoothingEnabled = false;
+        
         this.initializeFloor();
     }
 
@@ -645,93 +654,60 @@ export class RenderSystem {
     }
 
     drawWizard(player, isMe) {
-        this.ctx.scale(player.facingLeft ? -1 : 1, 1);
-        const x = player.facingLeft ? -player.x : player.x;
-
-        // Body
-        this.ctx.fillStyle = player.color;
-        this.ctx.beginPath();
-        this.ctx.arc(x, player.y, GAME_CONFIG.player.size, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        if (isMe) {
-            this.ctx.strokeStyle = '#FFD700';
-            this.ctx.lineWidth = 3;
-            this.ctx.stroke();
+        this.ctx.save();
+        
+        // Get current animation state
+        const pose = this.spriteSystem.getCastPose(player.id);
+        const staffRotation = this.spriteSystem.getStaffRotation(player.id);
+        
+        // Get wizard sprite with player color (always get the right-facing version)
+        const wizardSprite = this.spriteSystem.getSprite('wizard', player.color, pose, false);
+        const staffSprite = this.spriteSystem.getSprite('staff', null, 'idle', false);
+        
+        if (!wizardSprite || !staffSprite) return;
+        
+        // Position and scale
+        const scale = 2; // Scale up pixel art for better visibility
+        
+        // Move to player position and apply facing direction transformation
+        this.ctx.translate(player.x, player.y);
+        
+        // Apply horizontal flip if facing left
+        if (player.facingLeft) {
+            this.ctx.scale(-1, 1);
         }
-
-        this.drawWizardRobe(x, player);
-        this.drawWizardHat(x, player);
-        this.drawWizardFace(x, player);
-        this.drawWizardStaff(x, player);
-    }
-
-    drawWizardRobe(x, player) {
-        this.ctx.fillStyle = player.color;
-        this.ctx.beginPath();
-        this.ctx.moveTo(x - GAME_CONFIG.player.size, player.y);
-        this.ctx.lineTo(x - GAME_CONFIG.player.size + 5, player.y + GAME_CONFIG.player.size + 5);
-        this.ctx.lineTo(x + GAME_CONFIG.player.size - 5, player.y + GAME_CONFIG.player.size + 5);
-        this.ctx.lineTo(x + GAME_CONFIG.player.size, player.y);
-        this.ctx.closePath();
-        this.ctx.fill();
-    }
-
-    drawWizardHat(x, player) {
-        // Hat
-        this.ctx.fillStyle = '#4A4A4A';
-        this.ctx.beginPath();
-        this.ctx.moveTo(x - 15, player.y - 15);
-        this.ctx.lineTo(x, player.y - 35);
-        this.ctx.lineTo(x + 15, player.y - 15);
-        this.ctx.closePath();
-        this.ctx.fill();
-
-        // Star
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('⭐', x, player.y - 20);
-    }
-
-    drawWizardFace(x, player) {
-        // Face
-        this.ctx.fillStyle = '#FFE4C4';
-        this.ctx.beginPath();
-        this.ctx.arc(x, player.y - 2, 10, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        // Eyes
-        this.ctx.fillStyle = '#333';
-        this.ctx.beginPath();
-        this.ctx.arc(x - 4, player.y - 5, 2, 0, Math.PI * 2);
-        this.ctx.arc(x + 4, player.y - 5, 2, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        // Beard
-        this.ctx.fillStyle = '#DDDDDD';
-        this.ctx.beginPath();
-        this.ctx.moveTo(x - 8, player.y - 2);
-        this.ctx.lineTo(x, player.y + 10);
-        this.ctx.lineTo(x + 8, player.y - 2);
-        this.ctx.closePath();
-        this.ctx.fill();
-    }
-
-    drawWizardStaff(x, player) {
-        // Staff
-        this.ctx.strokeStyle = '#8B4513';
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.moveTo(x + 20, player.y - 10);
-        this.ctx.lineTo(x + 20, player.y + 25);
-        this.ctx.stroke();
-
-        // Staff orb
-        this.ctx.fillStyle = '#9370DB';
-        this.ctx.beginPath();
-        this.ctx.arc(x + 20, player.y - 15, 5, 0, Math.PI * 2);
-        this.ctx.fill();
+        
+        // Draw wizard sprite centered at origin
+        this.ctx.drawImage(
+            wizardSprite,
+            -(wizardSprite.width * scale) / 2,
+            -(wizardSprite.height * scale) / 2,
+            wizardSprite.width * scale,
+            wizardSprite.height * scale
+        );
+        
+        // Draw staff with rotation for casting animation
+        // Staff position is relative to the wizard in local coordinates
+        this.ctx.save();
+        
+        // Staff position (always to the right in local coordinates - flip handles the direction)
+        const staffX = 25; // Always positive - flip will handle left/right
+        const staffY = -5;
+        
+        this.ctx.translate(staffX, staffY);
+        this.ctx.rotate(staffRotation);
+        
+        this.ctx.drawImage(
+            staffSprite,
+            -(staffSprite.width * scale) / 2,
+            -(staffSprite.height * scale) / 2,
+            staffSprite.width * scale,
+            staffSprite.height * scale
+        );
+        
+        this.ctx.restore();
+        
+        this.ctx.restore();
     }
 
     drawPlayerTag(player) {

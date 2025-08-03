@@ -117,6 +117,11 @@ export class NetworkSystem {
 
     handleSpellCast(data) {
         this.game.spells.set(data.id, new Spell(data));
+        
+        // Trigger casting animation for the player who cast the spell
+        if (data.playerId && data.playerId !== this.game.myId) {
+            this.game.renderer.spriteSystem.createCastAnimation(data.playerId);
+        }
     }
 
     handleHealthUpdate(data) {
