@@ -20,6 +20,22 @@ const gameState = new GameState();
 const burnSystem = new BurnSystem(gameState, io);
 const socketManager = new SocketManager(io, gameState, burnSystem);
 
+// Game loop for server-side updates
+const gameLoop = () => {
+    gameState.update();
+    
+    // Always send item updates to all clients (even when empty to handle removals)
+    const itemsState = gameState.getItemsState();
+    io.emit('itemsUpdate', itemsState);
+    
+    // Send player updates to synchronize speed buffs and other dynamic data
+    const currentState = gameState.getCurrentState();
+    io.emit('gameStateUpdate', currentState);
+};
+
+// Start game loop (run every 100ms for better responsiveness)
+setInterval(gameLoop, 100);
+
 // Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {

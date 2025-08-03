@@ -10,6 +10,7 @@ export class UISystem {
         // Initialize UI elements if needed
         this.createLeaderboardModal();
         this.createDeathModal();
+        this.createEffectsDisplay();
         if (this.game.input.isMobile) {
             this.createMobileControls();
         }
@@ -48,15 +49,32 @@ export class UISystem {
         modal.className = 'modal';
         
         const content = document.createElement('div');
-        content.className = 'modal-content death-modal';
+        content.className = 'modal-content';
         content.innerHTML = `
             <h2>💀 You Died!</h2>
-            <p>Respawning in <span id="respawnTimer">3</span> seconds...</p>
-            <p class="respawn-note">You'll respawn at a random location with 2 seconds of protection!</p>
+            <p>Click anywhere to respawn</p>
         `;
         
         modal.appendChild(content);
         document.body.appendChild(modal);
+    }
+
+    createEffectsDisplay() {
+        const effectsDiv = document.createElement('div');
+        effectsDiv.id = 'activeEffects';
+        effectsDiv.style.position = 'absolute';
+        effectsDiv.style.top = '10px';
+        effectsDiv.style.left = '10px';
+        effectsDiv.style.zIndex = '1000';
+        effectsDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        effectsDiv.style.color = 'white';
+        effectsDiv.style.padding = '10px';
+        effectsDiv.style.borderRadius = '5px';
+        effectsDiv.style.fontFamily = 'Arial, sans-serif';
+        effectsDiv.style.fontSize = '14px';
+        effectsDiv.style.minWidth = '150px';
+        effectsDiv.style.display = 'none'; // Hidden by default
+        document.body.appendChild(effectsDiv);
     }
 
     toggleLeaderboard() {
@@ -144,5 +162,48 @@ export class UISystem {
     updatePlayerCount() {
         const count = this.game.players.size;
         document.getElementById('playerCount').textContent = `Players: ${count}`;
+    }
+
+    updateActiveEffects() {
+        const effectsDiv = document.getElementById('activeEffects');
+        const myPlayer = this.game.players.get(this.game.myId);
+        
+        if (!myPlayer || !myPlayer.isAlive) {
+            effectsDiv.style.display = 'none';
+            return;
+        }
+
+        const effects = [];
+        
+        // Check for speed buffs
+        if (myPlayer.currentSpeedMultiplier > 1.0) {
+            const speedBoost = Math.round((myPlayer.currentSpeedMultiplier - 1.0) * 100);
+            
+            // Calculate remaining time for speed buffs
+            let minTimeLeft = Infinity;
+            if (myPlayer.speedBuffs && myPlayer.speedBuffs.length > 0) {
+                const currentTime = Date.now();
+                minTimeLeft = Math.min(...myPlayer.speedBuffs.map(buff => buff.endTime - currentTime));
+                minTimeLeft = Math.max(0, Math.ceil(minTimeLeft / 1000)); // Convert to seconds
+            }
+            
+            if (minTimeLeft > 0 && minTimeLeft !== Infinity) {
+                effects.push(`🏃 Speed Boost: +${speedBoost}% (${minTimeLeft}s)`);
+            } else {
+                effects.push(`🏃 Speed Boost: +${speedBoost}%`);
+            }
+        }
+
+        // Add other effects here in the future (health, shield, etc.)
+        
+        if (effects.length > 0) {
+            effectsDiv.innerHTML = `
+                <div style="margin-bottom: 5px; font-weight: bold; color: #00FF00;">🧙‍♂️ Active Effects:</div>
+                ${effects.map(effect => `<div>${effect}</div>`).join('')}
+            `;
+            effectsDiv.style.display = 'block';
+        } else {
+            effectsDiv.style.display = 'none';
+        }
     }
 }

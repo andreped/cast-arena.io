@@ -18,11 +18,17 @@ export class RenderSystem {
         this.drawWorldBoundaries();
         this.drawWalls();
         this.drawGrid();
+        this.drawItems();
         this.drawSpells();
         this.drawPlayers();
         
         this.ctx.restore();
         this.renderMinimap();
+        
+        // Update UI effects display
+        if (this.game.ui) {
+            this.game.ui.updateActiveEffects();
+        }
     }
 
     clearCanvas() {
@@ -268,6 +274,93 @@ export class RenderSystem {
         }
     }
 
+    drawItems() {
+        this.game.items.forEach(item => {
+            if (item.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                this.drawItem(item);
+            }
+        });
+    }
+
+    drawItem(item) {
+        this.ctx.save();
+        
+        const time = Date.now() * 0.001; // Slower animation (was 0.005)
+        const bounce = Math.sin(time + item.animationOffset) * 3; // Gentler bounce (was 5)
+        const pulse = 0.95 + Math.sin(time * 1.5 + item.animationOffset) * 0.15; // Gentler pulsing (was time * 3 and 0.3)
+        
+        this.ctx.translate(item.x, item.y + bounce);
+        this.ctx.scale(pulse, pulse);
+
+        if (item.type === 'speed') {
+            // Draw speed boost item with bright green colors
+            const size = item.size;
+            
+            // Outer glow - bright green
+            this.ctx.shadowColor = item.color; // Bright green
+            this.ctx.shadowBlur = 20;
+            this.ctx.shadowOffsetX = 0;
+            this.ctx.shadowOffsetY = 0;
+            
+            // Draw multiple layered circles for a glowing effect
+            // Outer ring
+            this.ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size + 8, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Middle ring  
+            this.ctx.fillStyle = 'rgba(0, 255, 0, 0.6)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size + 4, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Main body - bright green
+            this.ctx.fillStyle = item.color;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Inner highlight
+            this.ctx.fillStyle = '#80FF80';
+            this.ctx.beginPath();
+            this.ctx.arc(-size * 0.3, -size * 0.3, size * 0.4, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Speed symbol (lightning bolt or arrow)
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.font = `${size}px Arial`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText('⚡', 0, 0);
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.beginPath();
+            this.ctx.moveTo(-size * 0.3, -size * 0.8);
+            this.ctx.lineTo(size * 0.2, -size * 0.2);
+            this.ctx.lineTo(-size * 0.1, -size * 0.1);
+            this.ctx.lineTo(size * 0.3, size * 0.8);
+            this.ctx.lineTo(-size * 0.2, size * 0.2);
+            this.ctx.lineTo(size * 0.1, size * 0.1);
+            this.ctx.closePath();
+            this.ctx.fill();
+            
+            // Inner highlight
+            this.ctx.shadowBlur = 0;
+            this.ctx.fillStyle = '#FFFF99';
+            this.ctx.beginPath();
+            this.ctx.moveTo(-size * 0.2, -size * 0.6);
+            this.ctx.lineTo(size * 0.1, -size * 0.3);
+            this.ctx.lineTo(-size * 0.05, -size * 0.2);
+            this.ctx.lineTo(size * 0.2, size * 0.6);
+            this.ctx.lineTo(-size * 0.1, size * 0.3);
+            this.ctx.lineTo(size * 0.05, size * 0.2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        this.ctx.restore();
+    }
+
     drawSpells() {
         this.game.spells.forEach(spell => {
             if (spell.isInViewport(this.game.camera.x, this.game.camera.y)) {
@@ -345,6 +438,21 @@ export class RenderSystem {
             this.ctx.globalAlpha = pulse * 0.5;
             this.ctx.fillStyle = '#6495ED';
             this.drawProtectionAura(player, 5);
+        }
+
+        // Draw speed boost aura
+        if (player.currentSpeedMultiplier > 1.0 && player.isAlive) {
+            const time = Date.now();
+            const speedPulse = Math.sin(time * 0.008) * 0.4 + 0.6;
+            const speedIntensity = Math.min((player.currentSpeedMultiplier - 1.0) * 2, 1.0);
+            
+            this.ctx.globalAlpha = speedPulse * speedIntensity * 0.7;
+            this.ctx.fillStyle = '#00FF00';
+            this.drawProtectionAura(player, 12);
+            
+            this.ctx.globalAlpha = speedPulse * speedIntensity * 0.4;
+            this.ctx.fillStyle = '#80FF80';
+            this.drawProtectionAura(player, 6);
         }
 
         // Draw burning effect
@@ -581,6 +689,22 @@ export class RenderSystem {
             
             this.minimapCtx.fillStyle = player.id === this.game.myId ? '#fff' : player.color;
             this.minimapCtx.fillRect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+        });
+
+        // Draw items
+        this.game.items.forEach(item => {
+            const dotSize = 3; // Slightly larger than players for visibility
+            const x = item.x * scale;
+            const y = item.y * scale;
+            
+            if (item.type === 'speed') {
+                this.minimapCtx.fillStyle = '#00FF00'; // Bright green for speed items
+                this.minimapCtx.fillRect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+                
+                // Add a small glow effect on minimap
+                this.minimapCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                this.minimapCtx.fillRect(x - dotSize, y - dotSize, dotSize * 2, dotSize * 2);
+            }
         });
     }
 }

@@ -25,6 +25,7 @@ class SocketManager {
         
         socket.emit('currentPlayers', this.gameState.getCurrentState());
         socket.emit('wallData', this.gameState.getWallState());
+        socket.emit('itemsUpdate', this.gameState.getItemsState());
         socket.broadcast.emit('newPlayer', player.toJSON());
         
         // Use safe spawn position
@@ -52,6 +53,9 @@ class SocketManager {
             if (movementData.facingLeft !== undefined) {
                 player.facingLeft = movementData.facingLeft;
             }
+
+            // Check for item pickups at new position
+            this.checkItemPickupsForPlayer(socket.id, player);
 
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
@@ -227,6 +231,20 @@ class SocketManager {
             isBurning: player.isBurning,
             burnEndTime: player.burnEndTime
         });
+    }
+
+    checkItemPickupsForPlayer(playerId, player) {
+        // Check if this specific player picked up any items at their current position
+        for (const [itemId, item] of this.gameState.itemSystem.items) {
+            if (item.isCollidingWithPlayer(player.x, player.y)) {
+                const pickup = this.gameState.itemSystem.pickupItem(playerId, itemId);
+                if (pickup) {
+                    console.log(`Instant pickup: Player ${playerId} picked up ${pickup.itemType} item`);
+                    // The game loop will send updates, but we could also send immediate update here
+                    break; // Player can only pick up one item per movement
+                }
+            }
+        }
     }
 }
 
