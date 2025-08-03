@@ -214,6 +214,11 @@ export class RenderSystem {
                 edgeColor = '#808080';
                 shadowColor = '#2F2F2F';
                 break;
+            case 'perimeter':
+                baseColor = '#4A4A4A';
+                edgeColor = '#5A5A5A';
+                shadowColor = '#1A1A1A';
+                break;
         }
 
         // Draw wall with 3D effect

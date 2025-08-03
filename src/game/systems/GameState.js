@@ -17,6 +17,11 @@ class GameState {
         return player;
     }
 
+    // Get a safe spawn position for a player
+    getSafeSpawnPosition() {
+        return this.wallSystem.findSafeSpawnPosition(gameConfig.world.width, gameConfig.world.height, 25);
+    }
+
     removePlayer(socketId) {
         this.players.delete(socketId);
         this.burnEffects.delete(socketId);

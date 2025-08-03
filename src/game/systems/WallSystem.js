@@ -4,8 +4,8 @@ const gameConfig = require('../../config/gameConfig');
 class WallSystem {
     constructor() {
         this.walls = new Map();
-        this.wallThickness = 20;
-        this.minDistanceFromSpawn = 100;
+        this.wallThickness = 30; // Increased from 20
+        this.minDistanceFromSpawn = 150; // Increased spawn protection area
         this.seed = 12345; // Fixed seed for consistent generation
         this.generateWalls();
     }
@@ -16,17 +16,42 @@ class WallSystem {
         return this.seed / 233280;
     }
 
+    generatePerimeterWalls(world) {
+        const borderThickness = this.wallThickness;
+        
+        // Create solid perimeter walls without gaps
+        // Top wall
+        const topWall = new Wall('perimeter_top', 'perimeter', 0, 0, world.width, borderThickness, []);
+        this.walls.set(topWall.id, topWall);
+        
+        // Bottom wall
+        const bottomWall = new Wall('perimeter_bottom', 'perimeter', 0, world.height - borderThickness, world.width, borderThickness, []);
+        this.walls.set(bottomWall.id, bottomWall);
+        
+        // Left wall
+        const leftWall = new Wall('perimeter_left', 'perimeter', 0, 0, borderThickness, world.height, []);
+        this.walls.set(leftWall.id, leftWall);
+        
+        // Right wall
+        const rightWall = new Wall('perimeter_right', 'perimeter', world.width - borderThickness, 0, borderThickness, world.height, []);
+        this.walls.set(rightWall.id, rightWall);
+    }
+
     generateWalls() {
         const { world } = gameConfig;
+        
+        // First, create perimeter walls around the entire map
+        this.generatePerimeterWalls(world);
+        
         const wallConfigs = [
-            // Line walls
-            { type: 'line', count: 8, minLength: 80, maxLength: 160 },
-            // L-shaped walls
-            { type: 'L', count: 4, minLength: 60, maxLength: 120 },
-            // House-like structures
-            { type: 'house', count: 3, minSize: 80, maxSize: 140 },
-            // Window walls
-            { type: 'window', count: 6, minLength: 100, maxLength: 180 }
+            // Line walls - increased sizes
+            { type: 'line', count: 6, minLength: 120, maxLength: 220 },
+            // L-shaped walls - increased sizes
+            { type: 'L', count: 3, minLength: 100, maxLength: 180 },
+            // House-like structures - increased sizes
+            { type: 'house', count: 2, minSize: 140, maxSize: 200 },
+            // Window walls - increased sizes
+            { type: 'window', count: 4, minLength: 150, maxLength: 250 }
         ];
 
         wallConfigs.forEach(config => {
@@ -107,7 +132,7 @@ class WallSystem {
 
     createHouseWall(x, y, config) {
         const size = config.minSize + this.seededRandom() * (config.maxSize - config.minSize);
-        const doorWidth = 30;
+        const doorWidth = 50; // Increased door width for easier player movement
         const id = `house_${Date.now()}_${Math.floor(this.seededRandom() * 1000)}`;
         
         // Create house walls with 2-3 entrances
@@ -115,12 +140,12 @@ class WallSystem {
             // Top wall
             { x: 0, y: 0, width: size, height: this.wallThickness },
             // Bottom wall with door
-            { x: 0, y: size - this.wallThickness, width: size * 0.3, height: this.wallThickness },
-            { x: size * 0.3 + doorWidth, y: size - this.wallThickness, width: size * 0.4 - doorWidth, height: this.wallThickness },
-            { x: size * 0.7 + doorWidth, y: size - this.wallThickness, width: size * 0.3 - doorWidth, height: this.wallThickness },
-            // Left wall
-            { x: 0, y: 0, width: this.wallThickness, height: size * 0.4 },
-            { x: 0, y: size * 0.4 + doorWidth, width: this.wallThickness, height: size * 0.6 - doorWidth },
+            { x: 0, y: size - this.wallThickness, width: size * 0.25, height: this.wallThickness },
+            { x: size * 0.25 + doorWidth, y: size - this.wallThickness, width: size * 0.5 - doorWidth, height: this.wallThickness },
+            { x: size * 0.75 + doorWidth, y: size - this.wallThickness, width: size * 0.25 - doorWidth, height: this.wallThickness },
+            // Left wall with door
+            { x: 0, y: 0, width: this.wallThickness, height: size * 0.3 },
+            { x: 0, y: size * 0.3 + doorWidth, width: this.wallThickness, height: size * 0.7 - doorWidth },
             // Right wall
             { x: size - this.wallThickness, y: 0, width: this.wallThickness, height: size }
         ];
@@ -131,32 +156,64 @@ class WallSystem {
     createWindowWall(x, y, config) {
         const length = config.minLength + this.seededRandom() * (config.maxLength - config.minLength);
         const isHorizontal = this.seededRandom() > 0.5;
-        const windowSize = 25;
-        const windowCount = 1 + Math.floor(this.seededRandom() * 3); // 1-3 windows
+        const windowSize = 40; // Increased window size for easier shooting
+        const windowCount = 1 + Math.floor(this.seededRandom() * 2); // 1-2 windows (reduced for larger windows)
         const id = `window_${Date.now()}_${Math.floor(this.seededRandom() * 1000)}`;
         
         const segments = [];
         
         if (isHorizontal) {
-            const segmentLength = length / (windowCount * 2 + 1);
-            for (let i = 0; i <= windowCount * 2; i += 2) {
-                segments.push({
-                    x: i * segmentLength,
-                    y: 0,
-                    width: segmentLength,
-                    height: this.wallThickness
-                });
+            const totalGapSpace = windowCount * windowSize;
+            const wallSpace = length - totalGapSpace;
+            const segmentLength = wallSpace / (windowCount + 1);
+            
+            let currentX = 0;
+            for (let i = 0; i <= windowCount; i++) {
+                if (i < windowCount) {
+                    // Add wall segment
+                    segments.push({
+                        x: currentX,
+                        y: 0,
+                        width: segmentLength,
+                        height: this.wallThickness
+                    });
+                    currentX += segmentLength + windowSize;
+                } else {
+                    // Final wall segment
+                    segments.push({
+                        x: currentX,
+                        y: 0,
+                        width: segmentLength,
+                        height: this.wallThickness
+                    });
+                }
             }
             return new Wall(id, 'window', x, y, length, this.wallThickness, segments);
         } else {
-            const segmentLength = length / (windowCount * 2 + 1);
-            for (let i = 0; i <= windowCount * 2; i += 2) {
-                segments.push({
-                    x: 0,
-                    y: i * segmentLength,
-                    width: this.wallThickness,
-                    height: segmentLength
-                });
+            const totalGapSpace = windowCount * windowSize;
+            const wallSpace = length - totalGapSpace;
+            const segmentLength = wallSpace / (windowCount + 1);
+            
+            let currentY = 0;
+            for (let i = 0; i <= windowCount; i++) {
+                if (i < windowCount) {
+                    // Add wall segment
+                    segments.push({
+                        x: 0,
+                        y: currentY,
+                        width: this.wallThickness,
+                        height: segmentLength
+                    });
+                    currentY += segmentLength + windowSize;
+                } else {
+                    // Final wall segment
+                    segments.push({
+                        x: 0,
+                        y: currentY,
+                        width: this.wallThickness,
+                        height: segmentLength
+                    });
+                }
             }
             return new Wall(id, 'window', x, y, this.wallThickness, length, segments);
         }
@@ -213,6 +270,26 @@ class WallSystem {
             walls[id] = wall.toJSON();
         }
         return walls;
+    }
+
+    // Find a safe spawn position that doesn't collide with walls
+    findSafeSpawnPosition(worldWidth, worldHeight, playerRadius = 25) {
+        const maxAttempts = 100;
+        const margin = playerRadius + 10; // Extra safety margin
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            // Generate random position with margins from world edges
+            const x = margin + Math.random() * (worldWidth - 2 * margin);
+            const y = margin + Math.random() * (worldHeight - 2 * margin);
+            
+            // Check if this position collides with any wall
+            if (!this.checkCollision(x, y, playerRadius)) {
+                return { x, y };
+            }
+        }
+        
+        // Fallback: return center position (should be safe due to minDistanceFromSpawn)
+        return { x: worldWidth / 2, y: worldHeight / 2 };
     }
 }
 

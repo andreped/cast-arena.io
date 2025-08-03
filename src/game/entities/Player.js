@@ -22,10 +22,18 @@ class Player {
         return gameConfig.colors[Math.floor(Math.random() * gameConfig.colors.length)];
     }
 
-    respawn() {
+    respawn(safePosition = null) {
         this.health = this.maxHealth;
-        this.x = Math.random() * gameConfig.world.width;
-        this.y = Math.random() * gameConfig.world.height;
+        
+        if (safePosition) {
+            this.x = safePosition.x;
+            this.y = safePosition.y;
+        } else {
+            // Fallback to random position if no safe position provided
+            this.x = Math.random() * gameConfig.world.width;
+            this.y = Math.random() * gameConfig.world.height;
+        }
+        
         this.isBurning = false;
         this.isAlive = true;
         this.burnEndTime = 0;

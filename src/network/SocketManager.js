@@ -27,7 +27,9 @@ class SocketManager {
         socket.emit('wallData', this.gameState.getWallState());
         socket.broadcast.emit('newPlayer', player.toJSON());
         
-        const respawnData = player.respawn();
+        // Use safe spawn position
+        const safePosition = this.gameState.getSafeSpawnPosition();
+        const respawnData = player.respawn(safePosition);
         this.emitRespawnEvents(respawnData);
         
         this.setupRespawnImmunity(socket.id);
@@ -165,7 +167,8 @@ class SocketManager {
         });
 
         setTimeout(() => {
-            const respawnData = target.respawn();
+            const safePosition = this.gameState.getSafeSpawnPosition();
+            const respawnData = target.respawn(safePosition);
             this.emitRespawnEvents(respawnData);
         }, gameConfig.player.respawnDelay);
     }
