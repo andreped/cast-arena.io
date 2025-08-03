@@ -1,6 +1,7 @@
 import { GAME_CONFIG } from './config/gameConfig.js';
 import { Player } from './entities/Player.js';
 import { Spell } from './entities/Spell.js';
+import { Wall } from './entities/Wall.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { RenderSystem } from './systems/RenderSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
@@ -8,11 +9,15 @@ import { UISystem } from './ui/UISystem.js';
 
 export class Game {
     constructor() {
+        // Store global reference for spell collision checking
+        window.gameInstance = this;
+        
         // Initialize main elements
         this.canvas = document.getElementById('gameCanvas');
         this.minimapCanvas = document.getElementById('minimapCanvas');
         this.players = new Map();
         this.spells = new Map();
+        this.walls = new Map();
         this.myId = null;
         this.isDead = false;
         
@@ -80,6 +85,36 @@ export class Game {
                 this.spells.delete(id);
             }
         });
+    }
+
+    addWall(wallData) {
+        const wall = new Wall(wallData);
+        this.walls.set(wall.id, wall);
+    }
+
+    setWalls(wallsData) {
+        this.walls.clear();
+        Object.values(wallsData).forEach(wallData => {
+            this.addWall(wallData);
+        });
+    }
+
+    checkWallCollision(x, y, radius = 0) {
+        for (const [id, wall] of this.walls) {
+            if (wall.collidesWith(x, y, radius)) {
+                return wall;
+            }
+        }
+        return null;
+    }
+
+    checkWallLineCollision(x1, y1, x2, y2) {
+        for (const [id, wall] of this.walls) {
+            if (wall.intersectsLine(x1, y1, x2, y2)) {
+                return wall;
+            }
+        }
+        return null;
     }
 
     canPlay() {

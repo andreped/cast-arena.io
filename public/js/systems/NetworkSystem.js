@@ -16,6 +16,7 @@ export class NetworkSystem {
         });
 
         this.socket.on('currentPlayers', this.handleCurrentPlayers.bind(this));
+        this.socket.on('wallData', this.handleWallData.bind(this));
         this.socket.on('newPlayer', this.handleNewPlayer.bind(this));
         this.socket.on('playerMoved', this.handlePlayerMoved.bind(this));
         this.socket.on('playerPositionUpdate', this.handlePlayerPositionUpdate.bind(this));
@@ -37,6 +38,11 @@ export class NetworkSystem {
         });
         this.game.ui.updatePlayerCount();
         this.game.ui.updateLeaderboard();  // Update leaderboard with initial players
+    }
+
+    handleWallData(wallData) {
+        this.game.setWalls(wallData);
+        console.log('Received wall data:', Object.keys(wallData).length, 'walls');
     }
 
     handleNewPlayer(data) {

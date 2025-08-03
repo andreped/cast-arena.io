@@ -16,6 +16,7 @@ export class RenderSystem {
         
         this.drawFloor();
         this.drawWorldBoundaries();
+        this.drawWalls();
         this.drawGrid();
         this.drawSpells();
         this.drawPlayers();
@@ -163,6 +164,100 @@ export class RenderSystem {
                     
                     this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
                     this.ctx.fillRect(x + px * pixelSize, y + py * pixelSize, pixelSize, pixelSize);
+                }
+            }
+        }
+    }
+
+    drawWalls() {
+        this.game.walls.forEach(wall => {
+            if (wall.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                this.drawWall(wall);
+            }
+        });
+    }
+
+    drawWall(wall) {
+        if (wall.segments && wall.segments.length > 0) {
+            // Draw segmented walls (L-shapes, houses, windows)
+            wall.segments.forEach(segment => {
+                const x = wall.x + segment.x;
+                const y = wall.y + segment.y;
+                this.drawWallSegment(x, y, segment.width, segment.height, wall.type);
+            });
+        } else {
+            // Draw simple rectangular walls
+            this.drawWallSegment(wall.x, wall.y, wall.width, wall.height, wall.type);
+        }
+    }
+
+    drawWallSegment(x, y, width, height, wallType) {
+        // Base wall color
+        let baseColor = '#666666';
+        let edgeColor = '#888888';
+        let shadowColor = '#333333';
+        
+        // Different colors for different wall types
+        switch (wallType) {
+            case 'house':
+                baseColor = '#8B4513';
+                edgeColor = '#A0522D';
+                shadowColor = '#654321';
+                break;
+            case 'window':
+                baseColor = '#708090';
+                edgeColor = '#9370DB';
+                shadowColor = '#2F4F4F';
+                break;
+            case 'L':
+                baseColor = '#696969';
+                edgeColor = '#808080';
+                shadowColor = '#2F2F2F';
+                break;
+        }
+
+        // Draw wall with 3D effect
+        this.ctx.fillStyle = baseColor;
+        this.ctx.fillRect(x, y, width, height);
+        
+        // Add edge highlight
+        this.ctx.fillStyle = edgeColor;
+        this.ctx.fillRect(x, y, width, 2);
+        this.ctx.fillRect(x, y, 2, height);
+        
+        // Add shadow
+        this.ctx.fillStyle = shadowColor;
+        this.ctx.fillRect(x + width - 2, y + 2, 2, height - 2);
+        this.ctx.fillRect(x + 2, y + height - 2, width - 2, 2);
+        
+        // Add pixelated texture
+        this.addWallTexture(x, y, width, height, wallType);
+    }
+
+    addWallTexture(x, y, width, height, wallType) {
+        const textureSize = 8;
+        const cols = Math.floor(width / textureSize);
+        const rows = Math.floor(height / textureSize);
+        
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const textureX = x + col * textureSize;
+                const textureY = y + row * textureSize;
+                
+                // Create texture pattern based on position
+                const seed = textureX * 13 + textureY * 17 + wallType.length * 7;
+                const rand = this.seededRandom(seed);
+                
+                if (rand < 0.15) {
+                    // Add texture variation
+                    const alpha = 0.3 + rand * 0.4;
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    this.ctx.fillRect(textureX, textureY, textureSize, textureSize);
+                } else if (rand > 0.85) {
+                    // Add darker spots
+                    const alpha = 0.2 + (1 - rand) * 0.3;
+                    this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                    this.ctx.fillRect(textureX, textureY, textureSize, textureSize);
                 }
             }
         }
