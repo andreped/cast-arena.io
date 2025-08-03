@@ -5,6 +5,8 @@ export class RenderSystem {
         this.game = game;
         this.ctx = game.canvas.getContext('2d');
         this.minimapCtx = game.minimapCanvas.getContext('2d');
+        this.floorCache = null;
+        this.initializeFloor();
     }
 
     render() {
@@ -12,7 +14,9 @@ export class RenderSystem {
         this.ctx.save();
         this.ctx.translate(-this.game.camera.x, -this.game.camera.y);
         
+        this.drawFloor();
         this.drawWorldBoundaries();
+        this.drawWalls();
         this.drawGrid();
         this.drawSpells();
         this.drawPlayers();
@@ -52,6 +56,215 @@ export class RenderSystem {
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(GAME_CONFIG.world.width, y);
             this.ctx.stroke();
+        }
+    }
+
+    initializeFloor() {
+        this.floorData = this.generateFloorPattern();
+    }
+
+    // Seeded random number generator for consistent patterns
+    seededRandom(seed) {
+        let x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+    }
+
+    generateFloorPattern() {
+        const { tileSize } = GAME_CONFIG.floor;
+        const tilesX = Math.ceil(GAME_CONFIG.world.width / tileSize);
+        const tilesY = Math.ceil(GAME_CONFIG.world.height / tileSize);
+        const pattern = [];
+
+        for (let y = 0; y < tilesY; y++) {
+            pattern[y] = [];
+            for (let x = 0; x < tilesX; x++) {
+                // Create deterministic randomness based on position and seed
+                const seedX = x * 73 + GAME_CONFIG.floor.seed;
+                const seedY = y * 37 + GAME_CONFIG.floor.seed;
+                const combinedSeed = seedX * seedY + GAME_CONFIG.floor.seed;
+                
+                const rand1 = this.seededRandom(combinedSeed);
+                const rand2 = this.seededRandom(combinedSeed + 1000);
+                
+                // Determine tile type based on weighted random
+                let tileType = 'stone';
+                if (rand1 < GAME_CONFIG.floor.patterns.darkStone.weight) {
+                    tileType = 'darkStone';
+                } else if (rand1 > (1 - GAME_CONFIG.floor.patterns.accent.weight)) {
+                    tileType = 'accent';
+                }
+                
+                // Choose variant within the tile type
+                const variants = GAME_CONFIG.floor.patterns[tileType].variants;
+                const variantIndex = Math.floor(rand2 * variants.length);
+                const color = variants[variantIndex];
+                
+                pattern[y][x] = {
+                    type: tileType,
+                    color: color,
+                    variant: variantIndex
+                };
+            }
+        }
+        
+        return pattern;
+    }
+
+    drawFloor() {
+        const { tileSize } = GAME_CONFIG.floor;
+        
+        // Calculate visible tiles based on camera position
+        const startTileX = Math.max(0, Math.floor(this.game.camera.x / tileSize));
+        const endTileX = Math.min(
+            this.floorData[0].length - 1,
+            Math.ceil((this.game.camera.x + this.game.canvas.width) / tileSize)
+        );
+        const startTileY = Math.max(0, Math.floor(this.game.camera.y / tileSize));
+        const endTileY = Math.min(
+            this.floorData.length - 1,
+            Math.ceil((this.game.camera.y + this.game.canvas.height) / tileSize)
+        );
+
+        // Draw floor tiles
+        for (let tileY = startTileY; tileY <= endTileY; tileY++) {
+            for (let tileX = startTileX; tileX <= endTileX; tileX++) {
+                const tile = this.floorData[tileY][tileX];
+                const x = tileX * tileSize;
+                const y = tileY * tileSize;
+                
+                this.ctx.fillStyle = tile.color;
+                this.ctx.fillRect(x, y, tileSize, tileSize);
+                
+                // Add subtle texture variation for pixel art effect
+                this.addPixelTexture(x, y, tileSize, tile);
+            }
+        }
+    }
+
+    addPixelTexture(x, y, size, tile) {
+        const pixelSize = 4; // Size of individual pixels within each tile
+        const pixelsPerSide = size / pixelSize;
+        
+        for (let py = 0; py < pixelsPerSide; py++) {
+            for (let px = 0; px < pixelsPerSide; px++) {
+                // Create texture based on tile position and pixel position
+                const seedPx = (x + px * pixelSize) * 13 + (y + py * pixelSize) * 17 + tile.variant;
+                const rand = this.seededRandom(seedPx);
+                
+                // Add subtle brightness variation (±10%)
+                if (rand < 0.3) {
+                    const brightness = rand < 0.15 ? 0.9 : 1.1;
+                    const baseColor = tile.color;
+                    
+                    // Parse hex color and adjust brightness
+                    const hex = baseColor.replace('#', '');
+                    const r = Math.min(255, Math.max(0, Math.floor(parseInt(hex.substr(0, 2), 16) * brightness)));
+                    const g = Math.min(255, Math.max(0, Math.floor(parseInt(hex.substr(2, 2), 16) * brightness)));
+                    const b = Math.min(255, Math.max(0, Math.floor(parseInt(hex.substr(4, 2), 16) * brightness)));
+                    
+                    this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    this.ctx.fillRect(x + px * pixelSize, y + py * pixelSize, pixelSize, pixelSize);
+                }
+            }
+        }
+    }
+
+    drawWalls() {
+        this.game.walls.forEach(wall => {
+            if (wall.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                this.drawWall(wall);
+            }
+        });
+    }
+
+    drawWall(wall) {
+        if (wall.segments && wall.segments.length > 0) {
+            // Draw segmented walls (L-shapes, houses, windows)
+            wall.segments.forEach(segment => {
+                const x = wall.x + segment.x;
+                const y = wall.y + segment.y;
+                this.drawWallSegment(x, y, segment.width, segment.height, wall.type);
+            });
+        } else {
+            // Draw simple rectangular walls
+            this.drawWallSegment(wall.x, wall.y, wall.width, wall.height, wall.type);
+        }
+    }
+
+    drawWallSegment(x, y, width, height, wallType) {
+        // Base wall color
+        let baseColor = '#666666';
+        let edgeColor = '#888888';
+        let shadowColor = '#333333';
+        
+        // Different colors for different wall types
+        switch (wallType) {
+            case 'house':
+                baseColor = '#8B4513';
+                edgeColor = '#A0522D';
+                shadowColor = '#654321';
+                break;
+            case 'window':
+                baseColor = '#708090';
+                edgeColor = '#9370DB';
+                shadowColor = '#2F4F4F';
+                break;
+            case 'L':
+                baseColor = '#696969';
+                edgeColor = '#808080';
+                shadowColor = '#2F2F2F';
+                break;
+            case 'perimeter':
+                baseColor = '#4A4A4A';
+                edgeColor = '#5A5A5A';
+                shadowColor = '#1A1A1A';
+                break;
+        }
+
+        // Draw wall with 3D effect
+        this.ctx.fillStyle = baseColor;
+        this.ctx.fillRect(x, y, width, height);
+        
+        // Add edge highlight
+        this.ctx.fillStyle = edgeColor;
+        this.ctx.fillRect(x, y, width, 2);
+        this.ctx.fillRect(x, y, 2, height);
+        
+        // Add shadow
+        this.ctx.fillStyle = shadowColor;
+        this.ctx.fillRect(x + width - 2, y + 2, 2, height - 2);
+        this.ctx.fillRect(x + 2, y + height - 2, width - 2, 2);
+        
+        // Add pixelated texture
+        this.addWallTexture(x, y, width, height, wallType);
+    }
+
+    addWallTexture(x, y, width, height, wallType) {
+        const textureSize = 8;
+        const cols = Math.floor(width / textureSize);
+        const rows = Math.floor(height / textureSize);
+        
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const textureX = x + col * textureSize;
+                const textureY = y + row * textureSize;
+                
+                // Create texture pattern based on position
+                const seed = textureX * 13 + textureY * 17 + wallType.length * 7;
+                const rand = this.seededRandom(seed);
+                
+                if (rand < 0.15) {
+                    // Add texture variation
+                    const alpha = 0.3 + rand * 0.4;
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    this.ctx.fillRect(textureX, textureY, textureSize, textureSize);
+                } else if (rand > 0.85) {
+                    // Add darker spots
+                    const alpha = 0.2 + (1 - rand) * 0.3;
+                    this.ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                    this.ctx.fillRect(textureX, textureY, textureSize, textureSize);
+                }
+            }
         }
     }
 

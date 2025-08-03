@@ -243,8 +243,18 @@ export class InputSystem {
         }
 
         if (moved) {
-            player.move(newX, newY);
-            this.game.network.sendMovement(player.getMovementData());
+            // Check for wall collisions before applying movement
+            const playerRadius = GAME_CONFIG.player.size;
+            const wallCollision = this.game.checkWallCollision(newX, newY, playerRadius);
+            
+            if (!wallCollision) {
+                // Check world boundaries
+                newX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newX));
+                newY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newY));
+                
+                player.move(newX, newY);
+                this.game.network.sendMovement(player.getMovementData());
+            }
         }
     }
 }

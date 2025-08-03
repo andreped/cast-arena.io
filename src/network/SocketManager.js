@@ -24,9 +24,12 @@ class SocketManager {
         const player = this.gameState.addPlayer(socket.id);
         
         socket.emit('currentPlayers', this.gameState.getCurrentState());
+        socket.emit('wallData', this.gameState.getWallState());
         socket.broadcast.emit('newPlayer', player.toJSON());
         
-        const respawnData = player.respawn();
+        // Use safe spawn position
+        const safePosition = this.gameState.getSafeSpawnPosition();
+        const respawnData = player.respawn(safePosition);
         this.emitRespawnEvents(respawnData);
         
         this.setupRespawnImmunity(socket.id);
@@ -39,19 +42,25 @@ class SocketManager {
             return;
         }
 
-        player.x = movementData.x;
-        player.y = movementData.y;
-        if (movementData.facingLeft !== undefined) {
-            player.facingLeft = movementData.facingLeft;
-        }
+        // Check wall collision before allowing movement
+        const playerRadius = 20; // Player collision radius
+        const wallCollision = this.gameState.checkWallCollision(movementData.x, movementData.y, playerRadius);
+        
+        if (!wallCollision) {
+            player.x = movementData.x;
+            player.y = movementData.y;
+            if (movementData.facingLeft !== undefined) {
+                player.facingLeft = movementData.facingLeft;
+            }
 
-        socket.broadcast.emit('playerMoved', {
-            id: socket.id,
-            x: movementData.x,
-            y: movementData.y,
-            facingLeft: player.facingLeft,
-            isAlive: player.isAlive
-        });
+            socket.broadcast.emit('playerMoved', {
+                id: socket.id,
+                x: movementData.x,
+                y: movementData.y,
+                facingLeft: player.facingLeft,
+                isAlive: player.isAlive
+            });
+        }
     }
 
     handleSpellCast(socket, spellData) {
@@ -158,7 +167,8 @@ class SocketManager {
         });
 
         setTimeout(() => {
-            const respawnData = target.respawn();
+            const safePosition = this.gameState.getSafeSpawnPosition();
+            const respawnData = target.respawn(safePosition);
             this.emitRespawnEvents(respawnData);
         }, gameConfig.player.respawnDelay);
     }

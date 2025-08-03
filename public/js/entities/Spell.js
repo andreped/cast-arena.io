@@ -49,6 +49,15 @@ export class Spell {
         const newX = this.x + this.directionX * moveDistance;
         const newY = this.y + this.directionY * moveDistance;
 
+        // Check for wall collision along the trajectory
+        // Access the game instance through a global reference or pass it as parameter
+        if (window.gameInstance && window.gameInstance.checkWallLineCollision) {
+            const wallHit = window.gameInstance.checkWallLineCollision(this.x, this.y, newX, newY);
+            if (wallHit) {
+                return true; // Spell hits wall and should be removed
+            }
+        }
+
         // Check collisions at intermediate points
         const steps = Math.max(1, Math.ceil(moveDistance / (GAME_CONFIG.player.size / 2)));
         const stepX = (newX - this.x) / steps;
