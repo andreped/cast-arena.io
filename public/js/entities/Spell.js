@@ -78,8 +78,8 @@ export class Spell {
             
             // IMPORTANT: Before checking players, verify no wall is between spell and player
             for (const [playerId, player] of players) {
-                // Skip if it's the caster or if player is dead or has spawn protection
-                if (playerId === this.casterId || !player.isAlive || player.spawnProtection) {
+                // Skip if it's the caster or if player has spawn protection
+                if (playerId === this.casterId || player.spawnProtection) {
                     continue;
                 }
 
@@ -94,14 +94,14 @@ export class Spell {
                     // BEFORE sending hit to server, double-check no wall between spell and player
                     if (game && game.checkWallLineCollision) {
                         const wallBetweenSpellAndPlayer = game.checkWallLineCollision(
-                            this.x, this.y, 
+                            checkX, checkY,  // Use current step position, not original spell position!
                             player.x, player.y
                         );
                         
                         if (wallBetweenSpellAndPlayer) {
                             // There's a wall between spell and player - treat as wall hit instead
                             if (game.addExplosion) {
-                                game.addExplosion(this.x, this.y, 'wall');
+                                game.addExplosion(checkX, checkY, 'wall');  // Explosion at step position
                             }
                             this.shouldRemove = true;
                             return true;

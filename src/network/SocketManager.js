@@ -14,6 +14,7 @@ class SocketManager {
             this.handlePlayerConnection(socket);
 
             socket.on('playerMovement', (data) => this.handlePlayerMovement(socket, data));
+            socket.on('playerAiming', (data) => this.handlePlayerAiming(socket, data));
             socket.on('castSpell', (data) => this.handleSpellCast(socket, data));
             socket.on('spellHit', (data) => this.handleSpellHit(socket, data));
             socket.on('disconnect', () => this.handleDisconnection(socket));
@@ -53,6 +54,9 @@ class SocketManager {
             if (movementData.facingLeft !== undefined) {
                 player.facingLeft = movementData.facingLeft;
             }
+            if (movementData.aimingAngle !== undefined) {
+                player.aimingAngle = movementData.aimingAngle;
+            }
 
             // Check for item pickups at new position
             this.checkItemPickupsForPlayer(socket.id, player);
@@ -62,9 +66,29 @@ class SocketManager {
                 x: movementData.x,
                 y: movementData.y,
                 facingLeft: player.facingLeft,
+                aimingAngle: player.aimingAngle,
                 isAlive: player.isAlive
             });
         }
+    }
+
+    handlePlayerAiming(socket, aimingData) {
+        const player = this.gameState.getPlayer(socket.id);
+        
+        if (!player || !player.isAlive) {
+            return;
+        }
+
+        // Update only the aiming angle, not position
+        if (aimingData.aimingAngle !== undefined) {
+            player.aimingAngle = aimingData.aimingAngle;
+        }
+
+        // Broadcast only the aiming update to other players
+        socket.broadcast.emit('playerAimed', {
+            id: socket.id,
+            aimingAngle: player.aimingAngle
+        });
     }
 
     handleSpellCast(socket, spellData) {
@@ -89,13 +113,6 @@ class SocketManager {
         const spell = this.gameState.spells.get(spellId);
         const target = this.gameState.getPlayer(targetId);
         const caster = this.gameState.getPlayer(spell?.casterId);
-
-        console.log('Received spell hit:', {
-            spellId,
-            targetId,
-            position,
-            socketId: socket.id
-        });
 
         // CRITICAL: Server-side wall collision validation
         // Check if there's a wall between the spell position and the target
@@ -126,29 +143,9 @@ class SocketManager {
                 y: target.y,
                 type: 'hit'
             });
-            console.log('Emitted explosion for player hit at:', target.x, target.y);
         }
 
-        // Debug validation state
-        const validationState = {
-            spellExists: !!spell,
-            targetExists: !!target,
-            casterExists: !!caster,
-            isDifferentPlayer: targetId !== (spell?.casterId),
-            noSpawnProtection: target?.spawnProtection === false,
-            targetIsAlive: target?.isAlive === true,
-            targetHealth: target?.health,
-            spellDetails: spell ? {
-                casterId: spell.casterId,
-                damage: spell.damage,
-                position: { x: spell.x, y: spell.y }
-            } : null
-        };
-        
-        console.log('Spell hit validation:', validationState);
-
         if (!this.validateSpellHit(spell, target, caster, targetId)) {
-            console.log('Spell hit validation failed:', validationState);
             // Still remove spell even if validation fails
             if (spell) {
                 this.gameState.removeSpell(spellId);
@@ -157,11 +154,6 @@ class SocketManager {
         }
 
         if (target.takeDamage(spell.damage)) {
-            console.log(`Player ${targetId} took damage:`, {
-                damage: spell.damage,
-                newHealth: target.health
-            });
-            
             this.gameState.applyBurnEffect(targetId);
             this.gameState.removeSpell(spellId);
 

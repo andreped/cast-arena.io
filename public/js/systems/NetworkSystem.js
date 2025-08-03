@@ -19,6 +19,7 @@ export class NetworkSystem {
         this.socket.on('wallData', this.handleWallData.bind(this));
         this.socket.on('newPlayer', this.handleNewPlayer.bind(this));
         this.socket.on('playerMoved', this.handlePlayerMoved.bind(this));
+        this.socket.on('playerAimed', this.handlePlayerAimed.bind(this));
         this.socket.on('playerPositionUpdate', this.handlePlayerPositionUpdate.bind(this));
         this.socket.on('forceSyncPlayer', this.handleForceSyncPlayer.bind(this));
         this.socket.on('playerDisconnected', this.handlePlayerDisconnected.bind(this));
@@ -33,6 +34,10 @@ export class NetworkSystem {
         this.socket.on('itemsUpdate', this.handleItemsUpdate.bind(this));
         this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
         this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
+        
+        // Throttling for movement updates
+        this.lastMovementUpdate = 0;
+        this.movementUpdateInterval = 1000 / 120; // 30 updates per second max
     }
 
     // Add cleanup method
@@ -70,6 +75,11 @@ export class NetworkSystem {
     }
 
     handlePlayerMoved(data) {
+        // Skip updating local player position to avoid jittering from server corrections
+        if (data.id === this.game.myId) {
+            return;
+        }
+        
         const player = this.game.players.get(data.id);
         if (player) {
             player.x = data.x;
@@ -77,8 +87,20 @@ export class NetworkSystem {
             if (data.facingLeft !== undefined) {
                 player.facingLeft = data.facingLeft;
             }
+            if (data.aimingAngle !== undefined) {
+                player.aimingAngle = data.aimingAngle;
+            }
             if (data.isAlive !== undefined) {
                 player.isAlive = data.isAlive;
+            }
+        }
+    }
+
+    handlePlayerAimed(data) {
+        const player = this.game.players.get(data.id);
+        if (player && data.id !== this.game.myId) {
+            if (data.aimingAngle !== undefined) {
+                player.aimingAngle = data.aimingAngle;
             }
         }
     }
@@ -117,6 +139,11 @@ export class NetworkSystem {
 
     handleSpellCast(data) {
         this.game.spells.set(data.id, new Spell(data));
+        
+        // Trigger casting animation for the player who cast the spell
+        if (data.playerId && data.playerId !== this.game.myId) {
+            this.game.renderer.spriteSystem.createCastAnimation(data.playerId);
+        }
     }
 
     handleHealthUpdate(data) {
@@ -192,7 +219,15 @@ export class NetworkSystem {
     }
 
     sendMovement(movementData) {
-        this.socket.emit('playerMovement', movementData);
+        const now = performance.now();
+        if (now - this.lastMovementUpdate >= this.movementUpdateInterval) {
+            this.socket.emit('playerMovement', movementData);
+            this.lastMovementUpdate = now;
+        }
+    }
+
+    sendAimingUpdate(aimingData) {
+        this.socket.emit('playerAiming', aimingData);
     }
 
     castSpell(spellData) {

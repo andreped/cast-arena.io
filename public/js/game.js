@@ -87,7 +87,7 @@ export class Game {
 
     update(deltaTime) {
         if (!this.isDead) {
-            this.input.update();
+            this.input.update(deltaTime);
         }
         this.updateCamera();
         this.updateSpells(deltaTime);
