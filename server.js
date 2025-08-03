@@ -22,6 +22,9 @@ const socketManager = new SocketManager(io, gameState, burnSystem);
 
 // Game loop for server-side updates
 const gameLoop = () => {
+    // Register this tick for TPS monitoring
+    socketManager.registerTick();
+    
     gameState.update();
     
     // Always send item updates to all clients (even when empty to handle removals)
@@ -36,8 +39,14 @@ const gameLoop = () => {
     socketManager.broadcastManaUpdates();
 };
 
-// Start game loop (run every 100ms for better responsiveness)
-const gameLoopInterval = setInterval(gameLoop, 100);
+// Configurable server tick rate (default 20 TPS = 50ms)
+const targetTPS = process.env.SERVER_TPS ? parseInt(process.env.SERVER_TPS) : 20;
+const tickInterval = 1000 / targetTPS;
+
+console.log(`🎮 Server configured for ${targetTPS} TPS (${tickInterval}ms intervals)`);
+
+// Start game loop with configurable tick rate
+const gameLoopInterval = setInterval(gameLoop, tickInterval);
 
 // Cleanup function for graceful shutdown
 const cleanup = () => {
