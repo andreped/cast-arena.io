@@ -70,11 +70,17 @@ export class UISystem {
 
     updateLeaderboard() {
         const content = document.getElementById('leaderboardContent');
-        if (!content) return;
+        if (!content) {
+            console.error('Leaderboard content element not found!');
+            return;
+        }
 
         // Create array of players from the Map
         const playersList = [];
+        console.log('Updating leaderboard, players Map size:', this.game.players.size);
+        
         for (const [id, player] of this.game.players) {
+            console.log('Processing player:', id, player);
             playersList.push({
                 id: player.id,
                 kills: player.kills || 0,
@@ -83,6 +89,8 @@ export class UISystem {
             });
         }
         playersList.sort((a, b) => b.kills - a.kills);
+
+        console.log('Final players list for leaderboard:', playersList);
 
         // Create HTML for leaderboard
         const html = playersList.map((player, index) => {

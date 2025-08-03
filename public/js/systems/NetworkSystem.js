@@ -36,11 +36,13 @@ export class NetworkSystem {
             this.game.players.set(id, new Player(id, data));
         });
         this.game.ui.updatePlayerCount();
+        this.game.ui.updateLeaderboard();  // Update leaderboard with initial players
     }
 
     handleNewPlayer(data) {
         this.game.players.set(data.id, new Player(data.id, data));
         this.game.ui.updatePlayerCount();
+        this.game.ui.updateLeaderboard();  // Update when new player joins
     }
 
     handlePlayerMoved(data) {
@@ -72,9 +74,10 @@ export class NetworkSystem {
         }
     }
 
-    handlePlayerDisconnected(playerId) {
-        this.game.players.delete(playerId);
+    handlePlayerDisconnected(id) {
+        this.game.players.delete(id);
         this.game.ui.updatePlayerCount();
+        this.game.ui.updateLeaderboard();  // Update leaderboard when player leaves
     }
 
     handlePlayerStateUpdate(data) {
@@ -105,6 +108,7 @@ export class NetworkSystem {
         const killer = this.game.players.get(data.killerId);
         if (killer) {
             killer.kills = data.killerKills;
+            this.game.ui.updateLeaderboard();  // Update leaderboard when kills change
         }
     }
 
