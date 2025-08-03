@@ -20,6 +20,7 @@ export class RenderSystem {
         this.drawGrid();
         this.drawItems();
         this.drawSpells();
+        this.drawExplosions();
         this.drawPlayers();
         
         this.ctx.restore();
@@ -408,6 +409,119 @@ export class RenderSystem {
         this.ctx.fill();
 
         this.ctx.restore();
+    }
+
+    drawExplosions() {
+        if (this.game.explosions.length > 0) {
+            console.log('Drawing explosions:', this.game.explosions.length); // Debug log
+        }
+        this.game.explosions.forEach(explosion => {
+            this.drawExplosion(explosion);
+        });
+    }
+
+    drawExplosion(explosion) {
+        const currentTime = Date.now();
+        const age = currentTime - explosion.startTime;
+        const progress = age / explosion.duration;
+        
+        if (progress >= 1) return; // Explosion finished
+        
+        this.ctx.save();
+        
+        // Calculate animation properties
+        const scale = 0.2 + progress * 1.3; // Start small, grow larger
+        const alpha = Math.max(0, 1 - progress * 1.5); // Fade out faster
+        const size = explosion.size * scale;
+        
+        this.ctx.globalAlpha = alpha;
+        this.ctx.translate(explosion.x, explosion.y);
+        
+        // Create flickering effect
+        const flicker = Math.sin(currentTime * 0.01 + explosion.x * 0.1) * 0.3 + 0.7;
+        
+        // Draw fire explosion with multiple layers
+        const layers = 5;
+        for (let i = 0; i < layers; i++) {
+            const layerProgress = Math.max(0, progress - (i * 0.05));
+            const layerScale = 0.4 + layerProgress * 0.8;
+            const layerAlpha = (1 - layerProgress) * flicker;
+            const layerSize = size * (0.6 + i * 0.15) * layerScale;
+            
+            if (layerProgress > 0 && layerAlpha > 0.1) {
+                this.ctx.globalAlpha = alpha * layerAlpha;
+                
+                // Fire colors - transition from white hot center to red edges
+                let fillStyle;
+                if (explosion.type === 'wall') {
+                    // Sparks/debris for wall hits - yellows and whites
+                    switch(i) {
+                        case 0: fillStyle = '#FFFFFF'; break; // White hot center
+                        case 1: fillStyle = '#FFFF99'; break; // Light yellow
+                        case 2: fillStyle = '#FFD700'; break; // Gold
+                        case 3: fillStyle = '#FFA500'; break; // Orange
+                        case 4: fillStyle = '#FF8C00'; break; // Dark orange
+                    }
+                } else {
+                    // Fire explosion for player hits - reds and oranges
+                    switch(i) {
+                        case 0: fillStyle = '#FFFFFF'; break; // White hot center
+                        case 1: fillStyle = '#FFFF66'; break; // Yellow core
+                        case 2: fillStyle = '#FF6600'; break; // Orange
+                        case 3: fillStyle = '#FF3300'; break; // Red-orange
+                        case 4: fillStyle = '#CC0000'; break; // Deep red
+                    }
+                }
+                
+                this.ctx.fillStyle = fillStyle;
+                
+                // Draw irregular explosion shape instead of perfect circles
+                this.ctx.beginPath();
+                const points = 8;
+                for (let p = 0; p < points; p++) {
+                    const angle = (p / points) * Math.PI * 2;
+                    // Add randomness to make it look more like fire
+                    const randomOffset = Math.sin(currentTime * 0.005 + angle * 3 + i) * 0.3 + 1;
+                    const radius = layerSize * randomOffset;
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    
+                    if (p === 0) {
+                        this.ctx.moveTo(x, y);
+                    } else {
+                        this.ctx.lineTo(x, y);
+                    }
+                }
+                this.ctx.closePath();
+                this.ctx.fill();
+                
+                // Add some particle effects for the outer layers
+                if (i >= 2 && layerProgress > 0.3) {
+                    this.drawFireParticles(layerSize, i, currentTime, explosion);
+                }
+            }
+        }
+        
+        this.ctx.restore();
+    }
+
+    drawFireParticles(baseSize, layer, currentTime, explosion) {
+        const particleCount = 6 - layer; // Fewer particles for outer layers
+        
+        for (let p = 0; p < particleCount; p++) {
+            const angle = (p / particleCount) * Math.PI * 2 + currentTime * 0.001;
+            const distance = baseSize * (0.8 + Math.sin(currentTime * 0.003 + p) * 0.4);
+            const x = Math.cos(angle) * distance;
+            const y = Math.sin(angle) * distance;
+            
+            const particleSize = 2 + Math.sin(currentTime * 0.01 + p) * 1;
+            
+            this.ctx.fillStyle = layer === 2 ? '#FFD700' : 
+                               layer === 3 ? '#FF8C00' : '#FF4500';
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, particleSize, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
     }
 
     drawPlayers() {
