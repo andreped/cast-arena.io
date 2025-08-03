@@ -22,6 +22,18 @@ export class InputSystem {
         this.joystickDirection = { x: 0, y: 0 };
         this.lastFireTime = 0;
 
+        // Store bound event handlers for cleanup
+        this.boundHandlers = {
+            keyDown: this.handleKeyDown.bind(this),
+            keyUp: this.handleKeyUp.bind(this),
+            mouseMove: this.handleMouseMove.bind(this),
+            click: this.handleClick.bind(this),
+            joystickStart: this.handleJoystickStart.bind(this),
+            joystickMove: this.handleJoystickMove.bind(this),
+            joystickEnd: this.handleJoystickEnd.bind(this),
+            fireButton: this.handleFireButton.bind(this)
+        };
+
         this.setupEventListeners();
         if (this.isMobile) {
             this.initMobileControls();
@@ -29,10 +41,40 @@ export class InputSystem {
     }
 
     setupEventListeners() {
-        document.addEventListener('keydown', this.handleKeyDown.bind(this));
-        document.addEventListener('keyup', this.handleKeyUp.bind(this));
-        this.game.canvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
-        this.game.canvas.addEventListener('click', this.handleClick.bind(this));
+        document.addEventListener('keydown', this.boundHandlers.keyDown);
+        document.addEventListener('keyup', this.boundHandlers.keyUp);
+        this.game.canvas.addEventListener('mousemove', this.boundHandlers.mouseMove);
+        this.game.canvas.addEventListener('click', this.boundHandlers.click);
+    }
+
+    // Add cleanup method
+    destroy() {
+        // Remove event listeners
+        document.removeEventListener('keydown', this.boundHandlers.keyDown);
+        document.removeEventListener('keyup', this.boundHandlers.keyUp);
+        this.game.canvas.removeEventListener('mousemove', this.boundHandlers.mouseMove);
+        this.game.canvas.removeEventListener('click', this.boundHandlers.click);
+
+        // Remove mobile control listeners if they exist
+        if (this.isMobile) {
+            const joystickArea = document.getElementById('joystickArea');
+            const fireButton = document.getElementById('fireButton');
+            
+            if (joystickArea) {
+                joystickArea.removeEventListener('touchstart', this.boundHandlers.joystickStart);
+                joystickArea.removeEventListener('touchmove', this.boundHandlers.joystickMove);
+                joystickArea.removeEventListener('touchend', this.boundHandlers.joystickEnd);
+            }
+            
+            if (fireButton) {
+                fireButton.removeEventListener('touchstart', this.boundHandlers.fireButton);
+                fireButton.removeEventListener('click', this.boundHandlers.fireButton);
+            }
+        }
+
+        // Clear references
+        this.boundHandlers = null;
+        this.game = null;
     }
 
     handleKeyDown(e) {
@@ -79,12 +121,12 @@ export class InputSystem {
         const joystick = document.getElementById('joystick');
         const fireButton = document.getElementById('fireButton');
 
-        joystickArea.addEventListener('touchstart', this.handleJoystickStart.bind(this), { passive: false });
-        joystickArea.addEventListener('touchmove', this.handleJoystickMove.bind(this), { passive: false });
-        joystickArea.addEventListener('touchend', this.handleJoystickEnd.bind(this), { passive: false });
+        joystickArea.addEventListener('touchstart', this.boundHandlers.joystickStart, { passive: false });
+        joystickArea.addEventListener('touchmove', this.boundHandlers.joystickMove, { passive: false });
+        joystickArea.addEventListener('touchend', this.boundHandlers.joystickEnd, { passive: false });
         
-        fireButton.addEventListener('touchstart', this.handleFireButton.bind(this), { passive: false });
-        fireButton.addEventListener('click', this.handleFireButton.bind(this));
+        fireButton.addEventListener('touchstart', this.boundHandlers.fireButton, { passive: false });
+        fireButton.addEventListener('click', this.boundHandlers.fireButton);
     }
 
     handleJoystickStart(e) {

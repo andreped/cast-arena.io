@@ -10,9 +10,6 @@ import { UISystem } from './ui/UISystem.js';
 
 export class Game {
     constructor() {
-        // Store global reference for spell collision checking
-        window.gameInstance = this;
-        
         // Initialize main elements
         this.canvas = document.getElementById('gameCanvas');
         this.minimapCanvas = document.getElementById('minimapCanvas');
@@ -23,6 +20,7 @@ export class Game {
         this.explosions = []; // Array to store active explosions
         this.myId = null;
         this.isDead = false;
+        this.isDestroyed = false;
         
         // Camera position
         this.camera = {
@@ -42,6 +40,8 @@ export class Game {
     }
 
     gameLoop() {
+        if (this.isDestroyed) return;
+        
         const currentTime = performance.now();
         const deltaTime = currentTime - this.lastUpdateTime;
         
@@ -50,6 +50,39 @@ export class Game {
         
         this.lastUpdateTime = currentTime;
         requestAnimationFrame(this.gameLoop.bind(this));
+    }
+
+    // Add cleanup method
+    destroy() {
+        this.isDestroyed = true;
+        
+        // Cleanup systems
+        if (this.network) {
+            this.network.destroy();
+            this.network = null;
+        }
+        
+        if (this.input) {
+            this.input.destroy();
+            this.input = null;
+        }
+        
+        if (this.ui) {
+            this.ui.destroy();
+            this.ui = null;
+        }
+        
+        // Clear collections
+        this.players.clear();
+        this.spells.clear();
+        this.walls.clear();
+        this.items.clear();
+        this.explosions.length = 0;
+        
+        // Clear references
+        this.canvas = null;
+        this.minimapCanvas = null;
+        this.renderer = null;
     }
 
     update(deltaTime) {
@@ -84,34 +117,15 @@ export class Game {
     }
 
     updateSpells(deltaTime) {
-        this.spells.forEach((spell, id) => {
-            const shouldRemove = spell.update(deltaTime, this.players, this.network.socket);
+        // Use Array.from to avoid modification during iteration issues
+        const spellEntries = Array.from(this.spells.entries());
+        
+        for (const [id, spell] of spellEntries) {
+            const shouldRemove = spell.update(deltaTime, this.players, this.network.socket, this);
             if (shouldRemove) {
-                console.log('Spell should be removed:', spell.x, spell.y); // Debug log
-                
-                // Check if spell hit a wall by testing wall collision at current position
-                if (this.checkWallLineCollision) {
-                    const wallHit = this.checkWallLineCollision(
-                        spell.x - spell.directionX * 20, 
-                        spell.y - spell.directionY * 20,
-                        spell.x, 
-                        spell.y
-                    );
-                    if (wallHit) {
-                        // Create explosion effect for wall hit
-                        console.log('Wall hit detected, creating explosion at:', spell.x, spell.y);
-                        this.addExplosion(spell.x, spell.y, 'wall');
-                    } else {
-                        console.log('No wall hit detected, creating explosion anyway for testing');
-                        this.addExplosion(spell.x, spell.y, 'wall');
-                    }
-                } else {
-                    console.log('checkWallLineCollision not available, creating explosion anyway');
-                    this.addExplosion(spell.x, spell.y, 'wall');
-                }
                 this.spells.delete(id);
             }
-        });
+        }
     }
 
     addWall(wallData) {
@@ -219,14 +233,33 @@ export class Game {
 
     updateExplosions(deltaTime) {
         const currentTime = Date.now();
-        this.explosions = this.explosions.filter(explosion => {
+        // Use a more efficient cleanup approach
+        for (let i = this.explosions.length - 1; i >= 0; i--) {
+            const explosion = this.explosions[i];
             const age = currentTime - explosion.startTime;
-            return age < explosion.duration;
-        });
+            if (age >= explosion.duration) {
+                this.explosions.splice(i, 1);
+            }
+        }
     }
 }
 
+// Store game instance for cleanup
+let gameInstance = null;
+
 // Start the game when the window loads
 window.addEventListener('load', () => {
-    new Game();
+    // Cleanup existing instance if any
+    if (gameInstance) {
+        gameInstance.destroy();
+    }
+    gameInstance = new Game();
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (gameInstance) {
+        gameInstance.destroy();
+        gameInstance = null;
+    }
 });

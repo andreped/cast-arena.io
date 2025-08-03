@@ -17,11 +17,32 @@ export class UISystem {
     }
 
     setupEventListeners() {
-        document.addEventListener('keydown', (e) => {
+        this.boundKeyHandler = (e) => {
             if (e.key === 'Escape') {
                 this.toggleLeaderboard();
             }
+        };
+        document.addEventListener('keydown', this.boundKeyHandler);
+    }
+
+    // Add cleanup method
+    destroy() {
+        if (this.boundKeyHandler) {
+            document.removeEventListener('keydown', this.boundKeyHandler);
+            this.boundKeyHandler = null;
+        }
+        
+        // Remove created DOM elements
+        const elements = ['leaderboardModal', 'deathModal', 'activeEffects', 'mobileControls'];
+        elements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.remove();
+            }
         });
+        
+        // Clear game reference
+        this.game = null;
     }
 
     createLeaderboardModal() {

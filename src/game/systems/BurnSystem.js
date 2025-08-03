@@ -4,11 +4,24 @@ class BurnSystem {
     constructor(gameState, io) {
         this.gameState = gameState;
         this.io = io;
+        this.burnInterval = null;
         this.startBurnLoop();
     }
 
     startBurnLoop() {
-        setInterval(() => this.processBurnEffects(), 100);
+        // Clear any existing interval to prevent duplicates
+        if (this.burnInterval) {
+            clearInterval(this.burnInterval);
+        }
+        this.burnInterval = setInterval(() => this.processBurnEffects(), 100);
+    }
+
+    // Add cleanup method
+    destroy() {
+        if (this.burnInterval) {
+            clearInterval(this.burnInterval);
+            this.burnInterval = null;
+        }
     }
 
     processBurnEffects() {
