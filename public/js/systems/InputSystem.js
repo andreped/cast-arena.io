@@ -320,17 +320,43 @@ export class InputSystem {
         }
 
         if (moved) {
-            // Check for wall collisions before applying movement
+            // Efficient wall sliding implementation
             const playerRadius = GAME_CONFIG.player.size;
-            const wallCollision = this.game.checkWallCollision(newX, newY, playerRadius);
             
-            if (!wallCollision) {
-                // Check world boundaries
+            // First, try the full movement
+            if (!this.game.checkWallCollision(newX, newY, playerRadius)) {
+                // No collision - apply full movement
                 newX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newX));
                 newY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newY));
                 
                 player.move(newX, newY);
                 this.game.network.sendMovement(player.getMovementData());
+            } else {
+                // Collision detected - try sliding
+                let slideX = player.x;
+                let slideY = player.y;
+                let didSlide = false;
+                
+                // Try horizontal movement only
+                if (newX !== player.x && !this.game.checkWallCollision(newX, player.y, playerRadius)) {
+                    slideX = newX;
+                    didSlide = true;
+                }
+                
+                // Try vertical movement only
+                if (newY !== player.y && !this.game.checkWallCollision(player.x, newY, playerRadius)) {
+                    slideY = newY;
+                    didSlide = true;
+                }
+                
+                if (didSlide) {
+                    // Apply world boundaries
+                    slideX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, slideX));
+                    slideY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, slideY));
+                    
+                    player.move(slideX, slideY);
+                    this.game.network.sendMovement(player.getMovementData());
+                }
             }
         }
     }
