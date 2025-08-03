@@ -78,8 +78,8 @@ export class Spell {
             
             // IMPORTANT: Before checking players, verify no wall is between spell and player
             for (const [playerId, player] of players) {
-                // Skip if it's the caster or if player is dead or has spawn protection
-                if (playerId === this.casterId || !player.isAlive || player.spawnProtection) {
+                // Skip if it's the caster or if player has spawn protection
+                if (playerId === this.casterId || player.spawnProtection) {
                     continue;
                 }
 

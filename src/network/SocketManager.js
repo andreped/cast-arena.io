@@ -150,29 +150,9 @@ class SocketManager {
                 y: target.y,
                 type: 'hit'
             });
-            console.log('Emitted explosion for player hit at:', target.x, target.y);
         }
 
-        // Debug validation state
-        const validationState = {
-            spellExists: !!spell,
-            targetExists: !!target,
-            casterExists: !!caster,
-            isDifferentPlayer: targetId !== (spell?.casterId),
-            noSpawnProtection: target?.spawnProtection === false,
-            targetIsAlive: target?.isAlive === true,
-            targetHealth: target?.health,
-            spellDetails: spell ? {
-                casterId: spell.casterId,
-                damage: spell.damage,
-                position: { x: spell.x, y: spell.y }
-            } : null
-        };
-        
-        console.log('Spell hit validation:', validationState);
-
         if (!this.validateSpellHit(spell, target, caster, targetId)) {
-            console.log('Spell hit validation failed:', validationState);
             // Still remove spell even if validation fails
             if (spell) {
                 this.gameState.removeSpell(spellId);
