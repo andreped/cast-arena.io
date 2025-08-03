@@ -31,6 +31,7 @@ export class NetworkSystem {
         this.socket.on('playerDied', this.handlePlayerDied.bind(this));
         this.socket.on('spawnProtectionEnded', this.handleSpawnProtectionEnded.bind(this));
         this.socket.on('itemsUpdate', this.handleItemsUpdate.bind(this));
+        this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
     }
 
     handleCurrentPlayers(serverPlayers) {
@@ -161,6 +162,16 @@ export class NetworkSystem {
         if (player) {
             player.spawnProtection = false;
         }
+    }
+
+    handleGameStateUpdate(gameState) {
+        // Update all players with current server state (including speed buffs)
+        Object.entries(gameState).forEach(([id, data]) => {
+            const player = this.game.players.get(id);
+            if (player) {
+                player.update(data);
+            }
+        });
     }
 
     sendMovement(movementData) {

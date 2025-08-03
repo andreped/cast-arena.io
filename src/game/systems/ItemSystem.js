@@ -5,10 +5,23 @@ class ItemSystem {
     constructor(gameState) {
         this.gameState = gameState;
         this.items = new Map();
-        this.maxSpeedItems = 8;
-        this.spawnInterval = 15000; // 15 seconds
-        this.lastSpawnTime = 0;
         this.seed = 54321; // Different seed from walls
+        
+        // Item type configurations - easily extendable for future items
+        this.itemConfigs = {
+            speed: {
+                maxItems: 8,
+                spawnInterval: 5000, // 5 seconds for testing (was 15000)
+                entityClass: SpeedItem,
+                lastSpawnTime: 0
+            }
+            // Future items can be added here:
+            // health: { maxItems: 5, spawnInterval: 20000, entityClass: HealthItem, lastSpawnTime: 0 },
+            // shield: { maxItems: 3, spawnInterval: 30000, entityClass: ShieldItem, lastSpawnTime: 0 }
+        };
+        
+        // Spawn initial items immediately
+        this.spawnInitialItems();
     }
 
     // Seeded random number generator
@@ -17,35 +30,49 @@ class ItemSystem {
         return this.seed / 233280;
     }
 
+    // Spawn some initial items when server starts
+    spawnInitialItems() {
+        console.log('Spawning initial items...');
+        for (const [itemType, config] of Object.entries(this.itemConfigs)) {
+            // Spawn half the max items initially
+            const initialCount = Math.floor(config.maxItems / 2);
+            for (let i = 0; i < initialCount; i++) {
+                this.trySpawnItem(itemType, config);
+            }
+        }
+    }
+
     update() {
         const currentTime = Date.now();
         
-        // Spawn new speed items if needed
-        if (currentTime - this.lastSpawnTime >= this.spawnInterval) {
-            this.trySpawnSpeedItem();
-            this.lastSpawnTime = currentTime;
+        // Check spawning for each item type
+        for (const [itemType, config] of Object.entries(this.itemConfigs)) {
+            if (currentTime - config.lastSpawnTime >= config.spawnInterval) {
+                this.trySpawnItem(itemType, config);
+                config.lastSpawnTime = currentTime;
+            }
         }
 
         // Check for item pickups
         this.checkItemPickups();
     }
 
-    trySpawnSpeedItem() {
-        // Count current speed items
-        const speedItemCount = Array.from(this.items.values())
-            .filter(item => item.type === 'speed').length;
+    trySpawnItem(itemType, config) {
+        // Count current items of this type
+        const itemCount = Array.from(this.items.values())
+            .filter(item => item.type === itemType).length;
 
-        if (speedItemCount >= this.maxSpeedItems) {
+        if (itemCount >= config.maxItems) {
             return; // Max items reached
         }
 
         const position = this.findSafeItemSpawnPosition();
         if (position) {
-            const itemId = `speed_${Date.now()}_${Math.floor(this.seededRandom() * 1000)}`;
-            const item = new SpeedItem(itemId, position.x, position.y);
+            const itemId = `${itemType}_${Date.now()}_${Math.floor(this.seededRandom() * 1000)}`;
+            const item = new config.entityClass(itemId, position.x, position.y);
             
             this.items.set(itemId, item);
-            console.log(`Spawned speed item at (${position.x}, ${position.y})`);
+            console.log(`Spawned ${itemType} item at (${position.x}, ${position.y})`);
             
             // Check if any player is already at this position for immediate pickup
             this.checkImmediatePickup(item);
@@ -54,7 +81,7 @@ class ItemSystem {
 
     findSafeItemSpawnPosition() {
         const maxAttempts = 50;
-        const itemRadius = 15;
+        const itemRadius = 40; // Updated to match new pickup radius
         const margin = itemRadius + 10;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -82,14 +109,21 @@ class ItemSystem {
     }
 
     checkItemPickups() {
+        const pickupsThisFrame = [];
+        
         for (const [itemId, item] of this.items) {
             for (const [playerId, player] of this.gameState.players) {
                 if (player.isAlive && item.isCollidingWithPlayer(player.x, player.y)) {
-                    this.pickupItem(playerId, item.id);
-                    break;
+                    const pickup = this.pickupItem(playerId, item.id);
+                    if (pickup) {
+                        pickupsThisFrame.push(pickup);
+                    }
+                    break; // Item picked up, no need to check other players
                 }
             }
         }
+        
+        return pickupsThisFrame; // Return pickups for potential broadcasting
     }
 
     pickupItem(playerId, itemId) {

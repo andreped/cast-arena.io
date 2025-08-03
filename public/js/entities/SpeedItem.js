@@ -4,7 +4,9 @@ export class SpeedItem {
         this.x = data.x;
         this.y = data.y;
         this.type = data.type;
-        this.size = data.size || 15;
+        this.size = data.size || 25; // Larger size for visibility
+        this.pickupRadius = data.pickupRadius || 30;
+        this.color = data.color || '#00FF00'; // Bright green
         this.speedBoost = data.speedBoost;
         this.duration = data.duration;
         this.animationOffset = Math.random() * Math.PI * 2; // Random start for animation
@@ -15,7 +17,7 @@ export class SpeedItem {
         const dx = this.x - playerX;
         const dy = this.y - playerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < (this.size + playerRadius);
+        return distance < (this.pickupRadius + playerRadius);
     }
 
     isInViewport(cameraX, cameraY, viewportWidth = 800, viewportHeight = 600) {
