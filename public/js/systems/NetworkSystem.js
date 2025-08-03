@@ -34,6 +34,10 @@ export class NetworkSystem {
         this.socket.on('itemsUpdate', this.handleItemsUpdate.bind(this));
         this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
         this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
+        
+        // Throttling for movement updates
+        this.lastMovementUpdate = 0;
+        this.movementUpdateInterval = 1000 / 120; // 30 updates per second max
     }
 
     // Add cleanup method
@@ -71,6 +75,11 @@ export class NetworkSystem {
     }
 
     handlePlayerMoved(data) {
+        // Skip updating local player position to avoid jittering from server corrections
+        if (data.id === this.game.myId) {
+            return;
+        }
+        
         const player = this.game.players.get(data.id);
         if (player) {
             player.x = data.x;
@@ -210,7 +219,11 @@ export class NetworkSystem {
     }
 
     sendMovement(movementData) {
-        this.socket.emit('playerMovement', movementData);
+        const now = performance.now();
+        if (now - this.lastMovementUpdate >= this.movementUpdateInterval) {
+            this.socket.emit('playerMovement', movementData);
+            this.lastMovementUpdate = now;
+        }
     }
 
     sendAimingUpdate(aimingData) {

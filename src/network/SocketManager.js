@@ -114,13 +114,6 @@ class SocketManager {
         const target = this.gameState.getPlayer(targetId);
         const caster = this.gameState.getPlayer(spell?.casterId);
 
-        console.log('Received spell hit:', {
-            spellId,
-            targetId,
-            position,
-            socketId: socket.id
-        });
-
         // CRITICAL: Server-side wall collision validation
         // Check if there's a wall between the spell position and the target
         if (spell && target && position) {
@@ -161,11 +154,6 @@ class SocketManager {
         }
 
         if (target.takeDamage(spell.damage)) {
-            console.log(`Player ${targetId} took damage:`, {
-                damage: spell.damage,
-                newHealth: target.health
-            });
-            
             this.gameState.applyBurnEffect(targetId);
             this.gameState.removeSpell(spellId);
 

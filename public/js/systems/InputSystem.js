@@ -268,7 +268,7 @@ export class InputSystem {
         }
     }
 
-    update() {
+    update(deltaTime) {
         if (!this.game.canPlay()) return;
         
         const player = this.game.players.get(this.game.myId);
@@ -278,7 +278,9 @@ export class InputSystem {
         let newX = player.x;
         let newY = player.y;
         
-        const effectiveSpeed = player.getEffectiveSpeed();
+        // Convert speed from pixels per frame to pixels per second
+        // Assuming target framerate of 60 FPS for the base speed
+        const effectiveSpeed = player.getEffectiveSpeed() * (deltaTime / 16.67); // 16.67ms = 60 FPS
 
         if (this.keys.w || this.keys.ArrowUp) {
             newY -= effectiveSpeed;

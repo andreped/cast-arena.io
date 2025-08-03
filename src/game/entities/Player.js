@@ -79,8 +79,6 @@ class Player {
         
         this.speedBuffs.push(buff);
         this.updateSpeedMultiplier();
-        
-        console.log(`Player ${this.id} now has ${this.speedBuffs.length} speed buff(s), total multiplier: ${this.currentSpeedMultiplier}`);
     }
 
     updateSpeedBuffs() {
