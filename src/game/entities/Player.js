@@ -37,9 +37,10 @@ class Player {
             this.x = safePosition.x;
             this.y = safePosition.y;
         } else {
-            // Fallback to random position if no safe position provided
-            this.x = Math.random() * gameConfig.world.width;
-            this.y = Math.random() * gameConfig.world.height;
+            // Safe fallback to center if no safe position provided
+            console.warn('Player respawn called without safe position, using center fallback');
+            this.x = gameConfig.world.width / 2;
+            this.y = gameConfig.world.height / 2;
         }
         
         this.isBurning = false;

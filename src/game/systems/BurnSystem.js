@@ -78,7 +78,8 @@ class BurnSystem {
 
         setTimeout(() => {
             if (player) {
-                const respawnData = player.respawn();
+                const safePosition = this.gameState.getSafeSpawnPosition();
+                const respawnData = player.respawn(safePosition);
                 this.emitRespawnEvents(respawnData);
             }
         }, gameConfig.player.respawnDelay);
