@@ -8,6 +8,9 @@ class Player {
         this.color = this.getRandomColor();
         this.health = gameConfig.player.maxHealth;
         this.maxHealth = gameConfig.player.maxHealth;
+        this.mana = gameConfig.player.maxMana;
+        this.maxMana = gameConfig.player.maxMana;
+        this.lastManaRegenTime = Date.now();
         this.kills = 0;
         this.isBurning = false;
         this.burnEndTime = 0;
@@ -27,6 +30,8 @@ class Player {
 
     respawn(safePosition = null) {
         this.health = this.maxHealth;
+        this.mana = this.maxMana;
+        this.lastManaRegenTime = Date.now();
         
         if (safePosition) {
             this.x = safePosition.x;
@@ -67,6 +72,27 @@ class Player {
             this.isAlive = false;
         }
         return true;
+    }
+
+    consumeMana(amount) {
+        if (this.mana >= amount) {
+            this.mana -= amount;
+            return true;
+        }
+        return false;
+    }
+
+    updateMana() {
+        if (this.mana < this.maxMana) {
+            const now = Date.now();
+            const timeDiff = (now - this.lastManaRegenTime) / 1000; // Convert to seconds
+            const manaToRestore = timeDiff * gameConfig.player.manaRegenRate;
+            
+            if (manaToRestore >= 1) { // Only regenerate when we have at least 1 point to add
+                this.mana = Math.min(this.maxMana, this.mana + Math.floor(manaToRestore));
+                this.lastManaRegenTime = now;
+            }
+        }
     }
 
     addSpeedBuff(speedMultiplier, duration) {
@@ -118,6 +144,8 @@ class Player {
             color: this.color,
             health: this.health,
             maxHealth: this.maxHealth,
+            mana: this.mana,
+            maxMana: this.maxMana,
             kills: this.kills,
             isBurning: this.isBurning,
             burnEndTime: this.burnEndTime,

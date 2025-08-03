@@ -242,10 +242,18 @@ export class InputSystem {
         const length = Math.sqrt(dx * dx + dy * dy);
         if (length === 0) return;
 
+        const player = this.game.players.get(this.game.myId);
+        
+        // Check if player has enough mana
+        if (player.mana < GAME_CONFIG.spell.manaCost) {
+            // Could add a visual/audio feedback for insufficient mana here
+            console.log('Not enough mana! Need', GAME_CONFIG.spell.manaCost, 'but only have', player.mana);
+            return;
+        }
+
         const normalizedDx = dx / length;
         const normalizedDy = dy / length;
         const angle = Math.atan2(normalizedDy, normalizedDx);
-        const player = this.game.players.get(this.game.myId);
         const targetDistance = 1000;
 
         // Update player's aiming angle for directional sprites

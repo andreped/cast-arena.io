@@ -11,6 +11,7 @@ export class UISystem {
         this.createLeaderboardModal();
         this.createDeathModal();
         this.createEffectsDisplay();
+        this.initPlayerStatsUI();
         if (this.game.input.isMobile) {
             this.createMobileControls();
         }
@@ -32,8 +33,21 @@ export class UISystem {
             this.boundKeyHandler = null;
         }
         
+        // Clean up tooltip events
+        if (this.healthBar) {
+            this.healthBar.removeEventListener('mouseenter', this.showTooltip);
+            this.healthBar.removeEventListener('mousemove', this.updateTooltipPosition);
+            this.healthBar.removeEventListener('mouseleave', this.hideTooltip);
+        }
+        
+        if (this.manaBar) {
+            this.manaBar.removeEventListener('mouseenter', this.showTooltip);
+            this.manaBar.removeEventListener('mousemove', this.updateTooltipPosition);
+            this.manaBar.removeEventListener('mouseleave', this.hideTooltip);
+        }
+        
         // Remove created DOM elements
-        const elements = ['leaderboardModal', 'deathModal', 'activeEffects', 'mobileControls'];
+        const elements = ['leaderboardModal', 'deathModal', 'activeEffects', 'mobileControls', 'healthTooltip', 'manaTooltip'];
         elements.forEach(id => {
             const element = document.getElementById(id);
             if (element) {
@@ -81,21 +95,142 @@ export class UISystem {
     }
 
     createEffectsDisplay() {
+        // Check if the element already exists in HTML
+        const existingEffectsDiv = document.getElementById('activeEffects');
+        if (existingEffectsDiv) {
+            // Element already exists in HTML, just ensure it's properly styled
+            return;
+        }
+        
+        // Create the element dynamically if it doesn't exist
         const effectsDiv = document.createElement('div');
         effectsDiv.id = 'activeEffects';
         effectsDiv.style.position = 'absolute';
-        effectsDiv.style.top = '10px';
+        effectsDiv.style.bottom = '10px';
         effectsDiv.style.left = '10px';
         effectsDiv.style.zIndex = '1000';
-        effectsDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        effectsDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
         effectsDiv.style.color = 'white';
-        effectsDiv.style.padding = '10px';
-        effectsDiv.style.borderRadius = '5px';
+        effectsDiv.style.padding = '6px';
+        effectsDiv.style.borderRadius = '6px';
+        effectsDiv.style.border = '2px solid #34495e';
         effectsDiv.style.fontFamily = 'Arial, sans-serif';
-        effectsDiv.style.fontSize = '14px';
+        effectsDiv.style.fontSize = '11px';
+        effectsDiv.style.fontWeight = 'bold';
         effectsDiv.style.minWidth = '150px';
         effectsDiv.style.display = 'none'; // Hidden by default
         document.body.appendChild(effectsDiv);
+    }
+
+    initPlayerStatsUI() {
+        // Get references to the health and mana bar elements
+        this.healthFill = document.getElementById('healthFill');
+        this.healthBar = document.getElementById('healthBar');
+        this.manaFill = document.getElementById('manaFill');
+        this.manaBar = document.getElementById('manaBar');
+        this.playerStats = document.getElementById('playerStats');
+        
+        // Get tooltip elements
+        this.healthTooltip = document.getElementById('healthTooltip');
+        this.manaTooltip = document.getElementById('manaTooltip');
+        
+        // Setup hover events for instant tooltips
+        this.setupTooltipEvents();
+        
+        // Initially hide until player is available
+        if (this.playerStats) {
+            this.playerStats.style.display = 'none';
+        }
+    }
+
+    setupTooltipEvents() {
+        if (this.healthBar && this.healthTooltip) {
+            this.healthBar.addEventListener('mouseenter', (e) => this.showTooltip(e, this.healthTooltip, 'health'));
+            this.healthBar.addEventListener('mousemove', (e) => this.updateTooltipPosition(e, this.healthTooltip));
+            this.healthBar.addEventListener('mouseleave', () => this.hideTooltip(this.healthTooltip));
+        }
+        
+        if (this.manaBar && this.manaTooltip) {
+            this.manaBar.addEventListener('mouseenter', (e) => this.showTooltip(e, this.manaTooltip, 'mana'));
+            this.manaBar.addEventListener('mousemove', (e) => this.updateTooltipPosition(e, this.manaTooltip));
+            this.manaBar.addEventListener('mouseleave', () => this.hideTooltip(this.manaTooltip));
+        }
+    }
+
+    showTooltip(event, tooltip, type) {
+        const player = this.game.players.get(this.game.myId);
+        if (!player) return;
+        
+        let text = '';
+        if (type === 'health') {
+            text = `Health: ${Math.ceil(player.health)}/${player.maxHealth}`;
+        } else if (type === 'mana') {
+            text = `Mana: ${Math.ceil(player.mana)}/${player.maxMana}`;
+        }
+        
+        tooltip.textContent = text;
+        tooltip.style.display = 'block';
+        this.updateTooltipPosition(event, tooltip);
+    }
+
+    updateTooltipPosition(event, tooltip) {
+        // Get the game area container to position relative to it
+        const gameArea = document.getElementById('gameArea');
+        const gameAreaRect = gameArea.getBoundingClientRect();
+        
+        // Calculate position relative to the game area
+        const relativeX = event.clientX - gameAreaRect.left;
+        const relativeY = event.clientY - gameAreaRect.top;
+        
+        // Get tooltip dimensions
+        const tooltipRect = tooltip.getBoundingClientRect();
+        
+        // Position tooltip above the cursor, centered horizontally
+        tooltip.style.left = (relativeX - tooltipRect.width / 2) + 'px';
+        tooltip.style.top = (relativeY - tooltipRect.height - 8) + 'px';
+    }
+
+    hideTooltip(tooltip) {
+        tooltip.style.display = 'none';
+    }
+
+    updatePlayerStats() {
+        const player = this.game.players.get(this.game.myId);
+        if (!player || !this.healthFill || !this.manaFill) return;
+
+        // Hide stats UI when player is dead
+        if (!player.isAlive) {
+            this.playerStats.style.display = 'none';
+            return;
+        } else {
+            this.playerStats.style.display = 'block';
+        }
+
+        // Update health bar
+        const healthPercent = (player.health / player.maxHealth) * 100;
+        this.healthFill.style.width = healthPercent + '%';
+        
+        // Update health bar color based on percentage
+        if (healthPercent > 60) {
+            this.healthFill.style.background = 'linear-gradient(90deg, #4CAF50, #66BB6A)';
+        } else if (healthPercent > 30) {
+            this.healthFill.style.background = 'linear-gradient(90deg, #FF9800, #FFB74D)';
+        } else {
+            this.healthFill.style.background = 'linear-gradient(90deg, #F44336, #EF5350)';
+        }
+
+        // Update mana bar
+        const manaPercent = (player.mana / player.maxMana) * 100;
+        this.manaFill.style.width = manaPercent + '%';
+        
+        // Update mana bar color based on percentage
+        if (manaPercent > 60) {
+            this.manaFill.style.background = 'linear-gradient(90deg, #2196F3, #42A5F5)';
+        } else if (manaPercent > 30) {
+            this.manaFill.style.background = 'linear-gradient(90deg, #FF9800, #FFB74D)';
+        } else {
+            this.manaFill.style.background = 'linear-gradient(90deg, #F44336, #EF5350)';
+        }
     }
 
     toggleLeaderboard() {

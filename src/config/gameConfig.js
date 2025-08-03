@@ -5,13 +5,16 @@ const gameConfig = {
     },
     player: {
         maxHealth: 100,
+        maxMana: 50,
+        manaRegenRate: 2, // mana per second
         spawnProtectionDuration: 2000,
         respawnDelay: 3000
     },
     spells: {
         fireball: {
             speed: 200,
-            damage: 20
+            damage: 20,
+            manaCost: 5
         }
     },
     burnEffect: {

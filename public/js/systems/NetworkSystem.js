@@ -34,6 +34,7 @@ export class NetworkSystem {
         this.socket.on('itemsUpdate', this.handleItemsUpdate.bind(this));
         this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
         this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
+        this.socket.on('manaUpdate', this.handleManaUpdate.bind(this));
         
         // Throttling for movement updates
         this.lastMovementUpdate = 0;
@@ -152,6 +153,14 @@ export class NetworkSystem {
             player.health = data.health;
             player.isBurning = data.isBurning;
             player.burnEndTime = data.burnEndTime;
+        }
+    }
+
+    handleManaUpdate(data) {
+        const player = this.game.players.get(data.id);
+        if (player) {
+            player.mana = data.mana;
+            player.maxMana = data.maxMana;
         }
     }
 

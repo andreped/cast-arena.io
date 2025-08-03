@@ -87,9 +87,10 @@ class GameState {
 
     // Update all game systems
     update() {
-        // Update player buffs
+        // Update player buffs and mana
         for (const [id, player] of this.players) {
             player.updateSpeedBuffs();
+            player.updateMana();
         }
 
         // Update item system (spawning, pickups, etc.)
