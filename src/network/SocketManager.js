@@ -72,10 +72,17 @@ class SocketManager {
     }
 
     handleSpellHit(socket, hitData) {
-        const { spellId, targetId } = hitData;
+        const { spellId, targetId, position } = hitData;
         const spell = this.gameState.spells.get(spellId);
         const target = this.gameState.getPlayer(targetId);
         const caster = this.gameState.getPlayer(spell?.casterId);
+
+        console.log('Received spell hit:', {
+            spellId,
+            targetId,
+            position,
+            socketId: socket.id
+        });
 
         // Debug validation state
         const validationState = {
@@ -84,7 +91,13 @@ class SocketManager {
             casterExists: !!caster,
             isDifferentPlayer: targetId !== (spell?.casterId),
             noSpawnProtection: target?.spawnProtection === false,
-            targetIsAlive: target?.isAlive === true
+            targetIsAlive: target?.isAlive === true,
+            targetHealth: target?.health,
+            spellDetails: spell ? {
+                casterId: spell.casterId,
+                damage: spell.damage,
+                position: { x: spell.x, y: spell.y }
+            } : null
         };
         
         console.log('Spell hit validation:', validationState);

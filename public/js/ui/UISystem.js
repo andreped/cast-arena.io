@@ -3,6 +3,7 @@ export class UISystem {
         this.game = game;
         this.showLeaderboard = false;
         this.setupUI();
+        this.setupEventListeners();
     }
 
     setupUI() {
@@ -14,6 +15,14 @@ export class UISystem {
         }
     }
 
+    setupEventListeners() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.toggleLeaderboard();
+            }
+        });
+    }
+
     createLeaderboardModal() {
         const modal = document.createElement('div');
         modal.id = 'leaderboardModal';
@@ -22,7 +31,11 @@ export class UISystem {
         
         const content = document.createElement('div');
         content.className = 'modal-content';
-        content.innerHTML = '<h2>Leaderboard</h2><div id="leaderboardContent"></div>';
+        content.innerHTML = `
+            <h2>🏆 Leaderboard</h2>
+            <div id="leaderboardContent"></div>
+            <p class="modal-close-hint">Press ESC to close</p>
+        `;
         
         modal.appendChild(content);
         document.body.appendChild(modal);
@@ -35,11 +48,59 @@ export class UISystem {
         modal.className = 'modal';
         
         const content = document.createElement('div');
-        content.className = 'modal-content';
-        content.innerHTML = '<h2>You Died!</h2><p>Respawning in 3 seconds...</p>';
+        content.className = 'modal-content death-modal';
+        content.innerHTML = `
+            <h2>💀 You Died!</h2>
+            <p>Respawning in <span id="respawnTimer">3</span> seconds...</p>
+            <p class="respawn-note">You'll respawn at a random location with 2 seconds of protection!</p>
+        `;
         
         modal.appendChild(content);
         document.body.appendChild(modal);
+    }
+
+    toggleLeaderboard() {
+        this.showLeaderboard = !this.showLeaderboard;
+        const modal = document.getElementById('leaderboardModal');
+        modal.style.display = this.showLeaderboard ? 'block' : 'none';
+        if (this.showLeaderboard) {
+            this.updateLeaderboard();
+        }
+    }
+
+    updateLeaderboard() {
+        const content = document.getElementById('leaderboardContent');
+        if (!content) return;
+
+        // Create array of players from the Map
+        const playersList = [];
+        for (const [id, player] of this.game.players) {
+            playersList.push({
+                id: player.id,
+                kills: player.kills || 0,
+                isAlive: player.isAlive,
+                isMe: player.id === this.game.myId
+            });
+        }
+        playersList.sort((a, b) => b.kills - a.kills);
+
+        // Create HTML for leaderboard
+        const html = playersList.map((player, index) => {
+            const rank = index + 1;
+            const rankEmoji = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '▫️';
+            const playerName = player.isMe ? 'You' : `Player ${player.id.slice(0, 4)}`;
+            const status = player.isAlive ? '🧙‍♂️' : '💀';
+            return `
+                <div class="leaderboard-row ${player.isMe ? 'highlight' : ''}">
+                    <span class="rank">${rankEmoji}</span>
+                    <span class="player-name">${playerName}</span>
+                    <span class="status">${status}</span>
+                    <span class="kills">💀 ${player.kills}</span>
+                </div>
+            `;
+        }).join('');
+
+        content.innerHTML = html;
     }
 
     createMobileControls() {
@@ -62,34 +123,7 @@ export class UISystem {
         document.body.appendChild(controls);
     }
 
-    toggleLeaderboard() {
-        this.showLeaderboard = !this.showLeaderboard;
-        document.getElementById('leaderboardModal').style.display = 
-            this.showLeaderboard ? 'block' : 'none';
-        if (this.showLeaderboard) {
-            this.updateLeaderboard();
-        }
-    }
-
-    updateLeaderboard() {
-        const content = document.getElementById('leaderboardContent');
-        const players = Array.from(this.game.players.values())
-            .sort((a, b) => (b.kills || 0) - (a.kills || 0));
-        
-        let html = '<table><tr><th>Player</th><th>Kills</th></tr>';
-        players.forEach(player => {
-            const isMe = player.id === this.game.myId;
-            html += `
-                <tr class="${isMe ? 'highlight' : ''}">
-                    <td>${isMe ? 'You' : 'Player ' + player.id.substr(0, 4)}</td>
-                    <td>${player.kills || 0}</td>
-                </tr>
-            `;
-        });
-        html += '</table>';
-        
-        content.innerHTML = html;
-    }
+    // Removed duplicate methods
 
     showDeathModal() {
         document.getElementById('deathModal').style.display = 'block';

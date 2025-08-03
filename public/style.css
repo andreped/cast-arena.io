@@ -49,6 +49,64 @@ h1 {
     opacity: 0.7;
 }
 
+/* Leaderboard styles */
+#leaderboardModal .modal-content {
+    max-width: 400px;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 20px;
+}
+
+#leaderboardContent {
+    margin-top: 20px;
+}
+
+.leaderboard-row {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin: 4px 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.leaderboard-row.highlight {
+    background: rgba(255, 215, 0, 0.2);
+    border: 1px solid rgba(255, 215, 0, 0.5);
+}
+
+.leaderboard-row:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.leaderboard-row .rank {
+    width: 40px;
+    text-align: center;
+}
+
+.leaderboard-row .player-name {
+    flex: 1;
+    text-align: left;
+    margin-left: 10px;
+}
+
+.leaderboard-row .status {
+    margin: 0 10px;
+}
+
+.leaderboard-row .kills {
+    width: 60px;
+    text-align: right;
+    color: #FFD700;
+}
+
+.modal-close-hint {
+    margin-top: 20px;
+    font-size: 12px;
+    opacity: 0.7;
+    text-align: center;
+}
+
 #controls p {
     margin: 5px 0;
 }

@@ -36,11 +36,6 @@ export class InputSystem {
     }
 
     handleKeyDown(e) {
-        if (e.key === 'Escape') {
-            this.game.ui.toggleLeaderboard();
-            return;
-        }
-        
         if (this.keys.hasOwnProperty(e.key)) {
             this.keys[e.key] = true;
             if (e.key === ' ') {

@@ -76,7 +76,7 @@ export class Game {
 
     updateSpells(deltaTime) {
         this.spells.forEach((spell, id) => {
-            if (spell.update(deltaTime)) {
+            if (spell.update(deltaTime, this.players, this.network.socket)) {
                 this.spells.delete(id);
             }
         });
