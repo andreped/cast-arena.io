@@ -5,6 +5,8 @@ export class RenderSystem {
         this.game = game;
         this.ctx = game.canvas.getContext('2d');
         this.minimapCtx = game.minimapCanvas.getContext('2d');
+        this.floorCache = null;
+        this.initializeFloor();
     }
 
     render() {
@@ -12,6 +14,7 @@ export class RenderSystem {
         this.ctx.save();
         this.ctx.translate(-this.game.camera.x, -this.game.camera.y);
         
+        this.drawFloor();
         this.drawWorldBoundaries();
         this.drawGrid();
         this.drawSpells();
@@ -52,6 +55,116 @@ export class RenderSystem {
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(GAME_CONFIG.world.width, y);
             this.ctx.stroke();
+        }
+    }
+
+    initializeFloor() {
+        this.floorData = this.generateFloorPattern();
+    }
+
+    // Seeded random number generator for consistent patterns
+    seededRandom(seed) {
+        let x = Math.sin(seed) * 10000;
+        return x - Math.floor(x);
+    }
+
+    generateFloorPattern() {
+        const { tileSize } = GAME_CONFIG.floor;
+        const tilesX = Math.ceil(GAME_CONFIG.world.width / tileSize);
+        const tilesY = Math.ceil(GAME_CONFIG.world.height / tileSize);
+        const pattern = [];
+
+        for (let y = 0; y < tilesY; y++) {
+            pattern[y] = [];
+            for (let x = 0; x < tilesX; x++) {
+                // Create deterministic randomness based on position and seed
+                const seedX = x * 73 + GAME_CONFIG.floor.seed;
+                const seedY = y * 37 + GAME_CONFIG.floor.seed;
+                const combinedSeed = seedX * seedY + GAME_CONFIG.floor.seed;
+                
+                const rand1 = this.seededRandom(combinedSeed);
+                const rand2 = this.seededRandom(combinedSeed + 1000);
+                
+                // Determine tile type based on weighted random
+                let tileType = 'stone';
+                if (rand1 < GAME_CONFIG.floor.patterns.darkStone.weight) {
+                    tileType = 'darkStone';
+                } else if (rand1 > (1 - GAME_CONFIG.floor.patterns.accent.weight)) {
+                    tileType = 'accent';
+                }
+                
+                // Choose variant within the tile type
+                const variants = GAME_CONFIG.floor.patterns[tileType].variants;
+                const variantIndex = Math.floor(rand2 * variants.length);
+                const color = variants[variantIndex];
+                
+                pattern[y][x] = {
+                    type: tileType,
+                    color: color,
+                    variant: variantIndex
+                };
+            }
+        }
+        
+        return pattern;
+    }
+
+    drawFloor() {
+        const { tileSize } = GAME_CONFIG.floor;
+        
+        // Calculate visible tiles based on camera position
+        const startTileX = Math.max(0, Math.floor(this.game.camera.x / tileSize));
+        const endTileX = Math.min(
+            this.floorData[0].length - 1,
+            Math.ceil((this.game.camera.x + this.game.canvas.width) / tileSize)
+        );
+        const startTileY = Math.max(0, Math.floor(this.game.camera.y / tileSize));
+        const endTileY = Math.min(
+            this.floorData.length - 1,
+            Math.ceil((this.game.camera.y + this.game.canvas.height) / tileSize)
+        );
+
+        // Draw floor tiles
+        for (let tileY = startTileY; tileY <= endTileY; tileY++) {
+            for (let tileX = startTileX; tileX <= endTileX; tileX++) {
+                const tile = this.floorData[tileY][tileX];
+                const x = tileX * tileSize;
+                const y = tileY * tileSize;
+                
+                this.ctx.fillStyle = tile.color;
+                this.ctx.fillRect(x, y, tileSize, tileSize);
+                
+                // Add subtle texture variation for pixel art effect
+                this.addPixelTexture(x, y, tileSize, tile);
+            }
+        }
+    }
+
+    addPixelTexture(x, y, size, tile) {
+        const pixelSize = 4; // Size of individual pixels within each tile
+        const pixelsPerSide = size / pixelSize;
+        
+        for (let py = 0; py < pixelsPerSide; py++) {
+            for (let px = 0; px < pixelsPerSide; px++) {
+                // Create texture based on tile position and pixel position
+                const seedPx = (x + px * pixelSize) * 13 + (y + py * pixelSize) * 17 + tile.variant;
+                const rand = this.seededRandom(seedPx);
+                
+                // Add subtle brightness variation (±10%)
+                if (rand < 0.3) {
+                    const brightness = rand < 0.15 ? 0.9 : 1.1;
+                    const baseColor = tile.color;
+                    
+                    // Parse hex color and adjust brightness
+                    const hex = baseColor.replace('#', '');
+                    const r = Math.min(255, Math.max(0, Math.floor(parseInt(hex.substr(0, 2), 16) * brightness)));
+                    const g = Math.min(255, Math.max(0, Math.floor(parseInt(hex.substr(2, 2), 16) * brightness)));
+                    const b = Math.min(255, Math.max(0, Math.floor(parseInt(hex.substr(4, 2), 16) * brightness)));
+                    
+                    this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                    this.ctx.fillRect(x + px * pixelSize, y + py * pixelSize, pixelSize, pixelSize);
+                }
+            }
         }
     }
 
