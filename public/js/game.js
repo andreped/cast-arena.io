@@ -20,6 +20,7 @@ export class Game {
         this.spells = new Map();
         this.walls = new Map();
         this.items = new Map();
+        this.explosions = []; // Array to store active explosions
         this.myId = null;
         this.isDead = false;
         
@@ -57,6 +58,7 @@ export class Game {
         }
         this.updateCamera();
         this.updateSpells(deltaTime);
+        this.updateExplosions(deltaTime);
     }
 
     updateCamera(instant = false) {
@@ -83,7 +85,30 @@ export class Game {
 
     updateSpells(deltaTime) {
         this.spells.forEach((spell, id) => {
-            if (spell.update(deltaTime, this.players, this.network.socket)) {
+            const shouldRemove = spell.update(deltaTime, this.players, this.network.socket);
+            if (shouldRemove) {
+                console.log('Spell should be removed:', spell.x, spell.y); // Debug log
+                
+                // Check if spell hit a wall by testing wall collision at current position
+                if (this.checkWallLineCollision) {
+                    const wallHit = this.checkWallLineCollision(
+                        spell.x - spell.directionX * 20, 
+                        spell.y - spell.directionY * 20,
+                        spell.x, 
+                        spell.y
+                    );
+                    if (wallHit) {
+                        // Create explosion effect for wall hit
+                        console.log('Wall hit detected, creating explosion at:', spell.x, spell.y);
+                        this.addExplosion(spell.x, spell.y, 'wall');
+                    } else {
+                        console.log('No wall hit detected, creating explosion anyway for testing');
+                        this.addExplosion(spell.x, spell.y, 'wall');
+                    }
+                } else {
+                    console.log('checkWallLineCollision not available, creating explosion anyway');
+                    this.addExplosion(spell.x, spell.y, 'wall');
+                }
                 this.spells.delete(id);
             }
         });
@@ -177,6 +202,27 @@ export class Game {
                 player.isRespawning = false;
             }
         }, 1000);
+    }
+
+    addExplosion(x, y, type = 'hit') {
+        const explosion = {
+            x,
+            y,
+            type,
+            startTime: Date.now(),
+            duration: 500, // 500ms explosion (was 300ms)
+            size: type === 'wall' ? 35 : 40 // Larger explosions
+        };
+        this.explosions.push(explosion);
+        console.log('Added explosion:', explosion); // Debug log
+    }
+
+    updateExplosions(deltaTime) {
+        const currentTime = Date.now();
+        this.explosions = this.explosions.filter(explosion => {
+            const age = currentTime - explosion.startTime;
+            return age < explosion.duration;
+        });
     }
 }
 

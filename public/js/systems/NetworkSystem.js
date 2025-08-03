@@ -32,6 +32,7 @@ export class NetworkSystem {
         this.socket.on('spawnProtectionEnded', this.handleSpawnProtectionEnded.bind(this));
         this.socket.on('itemsUpdate', this.handleItemsUpdate.bind(this));
         this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
+        this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
     }
 
     handleCurrentPlayers(serverPlayers) {
@@ -172,6 +173,12 @@ export class NetworkSystem {
                 player.update(data);
             }
         });
+    }
+
+    handleSpellExplosion(data) {
+        // Add explosion effect at the specified position
+        console.log('Received explosion event:', data); // Debug log
+        this.game.addExplosion(data.x, data.y, data.type);
     }
 
     sendMovement(movementData) {

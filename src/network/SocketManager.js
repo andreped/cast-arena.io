@@ -97,6 +97,16 @@ class SocketManager {
             socketId: socket.id
         });
 
+        // Always emit explosion at hit position, even if validation fails
+        if (position && target) {
+            this.io.emit('spellExplosion', {
+                x: target.x,
+                y: target.y,
+                type: 'hit'
+            });
+            console.log('Emitted explosion for player hit at:', target.x, target.y);
+        }
+
         // Debug validation state
         const validationState = {
             spellExists: !!spell,
@@ -117,6 +127,10 @@ class SocketManager {
 
         if (!this.validateSpellHit(spell, target, caster, targetId)) {
             console.log('Spell hit validation failed:', validationState);
+            // Still remove spell even if validation fails
+            if (spell) {
+                this.gameState.removeSpell(spellId);
+            }
             return;
         }
 
