@@ -27,6 +27,14 @@ export class InputSystem {
         this.pendingInputs = new Map(); // Store pending inputs for reconciliation
         this.lastServerUpdate = 0;
         this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
+        
+        // Advanced smoothing system for jitter reduction
+        this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
+        this.maxSnapThreshold = 15; // If debt exceeds this, snap immediately (prevents rubber-banding)
+        this.smoothingRate = 0.1; // Max 10% of debt corrected per frame
+        this.frameDebtReduction = 0.5; // Max pixels to correct per frame
+        this.serverStateBuffer = []; // Buffer recent server states for interpolation
+        this.maxBufferSize = 3; // Keep 3 recent states for smooth interpolation
 
         // Debug logging for production
         this.debugMode = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
@@ -326,6 +334,9 @@ export class InputSystem {
         // Calculate FPS
         this.calculateFPS(deltaTime);
         
+        // Apply any pending smooth corrections even when not receiving new server data
+        this.applySmoothCorrection(this.game.players.get(this.game.myId));
+        
         if (!this.game.canPlay()) return;
         
         const player = this.game.players.get(this.game.myId);
@@ -443,7 +454,7 @@ export class InputSystem {
         }
     }
 
-    // Handle server position reconciliation
+    // Handle server position reconciliation with advanced smoothing
     handleServerReconciliation(serverData) {
         const player = this.game.players.get(this.game.myId);
         if (!player || !serverData.sequence) return;
@@ -462,8 +473,8 @@ export class InputSystem {
         this.debugStats.avgLatency = (this.debugStats.avgLatency + latency) / 2;
 
         // Calculate difference between client prediction and server position
-        const deltaX = Math.abs(player.x - serverData.x);
-        const deltaY = Math.abs(player.y - serverData.y);
+        const deltaX = serverData.x - player.x;
+        const deltaY = serverData.y - player.y;
         const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
         // Track largest delta for debugging
@@ -471,27 +482,58 @@ export class InputSystem {
             this.debugStats.largestDelta = totalDelta;
         }
 
+        // Add server state to buffer for interpolation
+        this.serverStateBuffer.push({
+            timestamp: performance.now(),
+            x: serverData.x,
+            y: serverData.y,
+            sequence: serverData.sequence
+        });
+        
+        // Keep buffer size manageable
+        if (this.serverStateBuffer.length > this.maxBufferSize) {
+            this.serverStateBuffer.shift();
+        }
+
         // Debug logging
         if (this.debugMode || window.location.hostname === 'localhost') {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
-            
-            if (totalDelta > this.reconciliationThreshold) {
-                this.addDebugLog(`🔄 CORRECTING position by ${totalDelta.toFixed(1)}px`);
-                console.log(`Jiggle detected: Client(${player.x.toFixed(1)}, ${player.y.toFixed(1)}) vs Server(${serverData.x.toFixed(1)}, ${serverData.y.toFixed(1)})`);
-            }
         }
 
-        // Only reconcile if difference is significant AND player isn't actively moving
+        // Check if player is actively moving
         const isMoving = this.keys.w || this.keys.s || this.keys.a || this.keys.d || 
                          this.keys.ArrowUp || this.keys.ArrowDown || this.keys.ArrowLeft || this.keys.ArrowRight ||
                          (this.isMobile && this.joystickActive);
-        
-        if (totalDelta > this.reconciliationThreshold && !isMoving) {
-            this.debugStats.reconciliations++;
-            // Smoothly interpolate to server position over a few frames
-            this.reconcilePosition(player, serverData.x, serverData.y);
-        } else if (totalDelta > this.reconciliationThreshold && isMoving) {
-            console.log(`Skipping reconciliation - player is moving (Δ=${totalDelta.toFixed(1)}px)`);
+
+        // Advanced smoothing approach based on gamedev.stackexchange suggestions
+        if (totalDelta > this.reconciliationThreshold) {
+            // Accumulate position debt instead of immediate correction
+            this.positionDebt.x += deltaX;
+            this.positionDebt.y += deltaY;
+            
+            const totalDebt = Math.sqrt(this.positionDebt.x * this.positionDebt.x + this.positionDebt.y * this.positionDebt.y);
+            
+            if (totalDebt > this.maxSnapThreshold) {
+                // Debt too large - snap to server position and reset debt
+                if (this.debugMode) {
+                    this.addDebugLog(`💥 SNAP - debt too large: ${totalDebt.toFixed(1)}px`);
+                }
+                player.x = serverData.x;
+                player.y = serverData.y;
+                this.positionDebt.x = 0;
+                this.positionDebt.y = 0;
+                this.debugStats.reconciliations++;
+            } else if (!isMoving) {
+                // Player not moving - apply smooth debt reduction
+                this.applySmoothCorrection(player);
+                this.debugStats.reconciliations++;
+            } else {
+                // Player is moving - reduce debt more gradually to avoid jitter
+                this.applySmoothCorrection(player, 0.05); // Even gentler correction while moving
+                if (this.debugMode) {
+                    this.addDebugLog(`🎮 SMOOTH while moving - debt: ${totalDebt.toFixed(1)}px`);
+                }
+            }
         }
 
         // Remove processed input and older ones
@@ -502,17 +544,33 @@ export class InputSystem {
         }
     }
 
-    reconcilePosition(player, targetX, targetY) {
-        // Much smoother interpolation to reduce visible jiggling
-        const lerpFactor = 0.1; // Reduced from 0.3 for smoother correction
-        const deltaX = targetX - player.x;
-        const deltaY = targetY - player.y;
+    // Apply smooth position correction based on accumulated debt
+    applySmoothCorrection(player, customRate = null) {
+        const rate = customRate || this.smoothingRate;
+        const maxCorrection = this.frameDebtReduction;
         
-        // Only apply correction if it's significant enough to be worth the visual disruption
-        const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        if (totalDelta > 0.5) { // Don't correct tiny differences
-            player.x += deltaX * lerpFactor;
-            player.y += deltaY * lerpFactor;
+        // Calculate how much debt to pay off this frame
+        const debtMagnitude = Math.sqrt(this.positionDebt.x * this.positionDebt.x + this.positionDebt.y * this.positionDebt.y);
+        
+        if (debtMagnitude > 0.1) { // Only correct if debt is meaningful
+            // Limit correction to maximum per-frame amount
+            const correctionMagnitude = Math.min(debtMagnitude * rate, maxCorrection);
+            const correctionRatio = correctionMagnitude / debtMagnitude;
+            
+            const correctionX = this.positionDebt.x * correctionRatio;
+            const correctionY = this.positionDebt.y * correctionRatio;
+            
+            // Apply correction to player position
+            player.x += correctionX;
+            player.y += correctionY;
+            
+            // Reduce debt by the amount corrected
+            this.positionDebt.x -= correctionX;
+            this.positionDebt.y -= correctionY;
+            
+            if (this.debugMode && Math.abs(correctionX) > 0.1 || Math.abs(correctionY) > 0.1) {
+                this.addDebugLog(`🔧 SMOOTH: corrected (${correctionX.toFixed(1)}, ${correctionY.toFixed(1)}), remaining debt: ${(debtMagnitude - correctionMagnitude).toFixed(1)}px`);
+            }
         }
     }
 
@@ -527,9 +585,12 @@ export class InputSystem {
     }
 
     getDebugInfo() {
+        const debtMagnitude = Math.sqrt(this.positionDebt.x * this.positionDebt.x + this.positionDebt.y * this.positionDebt.y);
         return {
             ...this.debugStats,
             pendingInputs: this.pendingInputs.size,
+            positionDebt: debtMagnitude.toFixed(1) + 'px',
+            serverBufferSize: this.serverStateBuffer.length,
             recentLogs: this.debugLog.slice(-10),
             reconciliationRate: this.debugStats.totalInputs > 0 ? 
                 (this.debugStats.reconciliations / this.debugStats.totalInputs * 100).toFixed(1) + '%' : '0%'
@@ -577,8 +638,8 @@ export class InputSystem {
             const stats = this.getDebugInfo();
             statsEl.innerHTML = `
                 Inputs: ${stats.totalInputs} | Reconciles: ${stats.reconciliations} (${stats.reconciliationRate})<br>
-                Pending: ${stats.pendingInputs} | Max Δ: ${stats.largestDelta.toFixed(1)}px<br>
-                Avg Latency: ${stats.avgLatency.toFixed(1)}ms | Network: ${stats.networkUpdates}
+                Pending: ${stats.pendingInputs} | Max Δ: ${stats.largestDelta.toFixed(1)}px | Debt: ${stats.positionDebt}<br>
+                Avg Latency: ${stats.avgLatency.toFixed(1)}ms | Network: ${stats.networkUpdates} | Buffer: ${stats.serverBufferSize}
             `;
             
             logsEl.innerHTML = stats.recentLogs.map(log => `<div>${log}</div>`).join('');
