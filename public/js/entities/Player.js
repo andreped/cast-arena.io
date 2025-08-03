@@ -13,6 +13,7 @@ export class Player {
         this.burnEndTime = data.burnEndTime || 0;
         this.isAlive = data.isAlive !== undefined ? data.isAlive : true;
         this.facingLeft = data.facingLeft || false;
+        this.aimingAngle = data.aimingAngle || 0; // New: current aiming direction in radians
         this.spawnProtection = data.spawnProtection || false;
         this.isRespawning = data.isRespawning || false;
         this.currentSpeedMultiplier = data.currentSpeedMultiplier || 1.0;
@@ -44,7 +45,8 @@ export class Player {
         return {
             x: this.x,
             y: this.y,
-            facingLeft: this.facingLeft
+            facingLeft: this.facingLeft,
+            aimingAngle: this.aimingAngle
         };
     }
 

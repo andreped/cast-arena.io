@@ -77,6 +77,9 @@ export class NetworkSystem {
             if (data.facingLeft !== undefined) {
                 player.facingLeft = data.facingLeft;
             }
+            if (data.aimingAngle !== undefined) {
+                player.aimingAngle = data.aimingAngle;
+            }
             if (data.isAlive !== undefined) {
                 player.isAlive = data.isAlive;
             }

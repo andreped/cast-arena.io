@@ -6,18 +6,20 @@ export class SpriteSystem {
     }
 
     createWizardSprites() {
-        // Create pixel art wizard sprites directly in code for now
-        // Later we can load from actual sprite sheets
+        // Create pixel art wizard sprites for all 4 directions
         this.createWizardIdleSprite();
         this.createWizardCastSprite();
+        this.createWizardFrontSprite();
+        this.createWizardBackSprite();
         this.createStaffSprite();
+        this.createVerticalStaffSprite();
         
-        // Create left-facing versions
+        // Create left-facing versions (flip right-facing sprites)
         this.createFlippedSprites();
     }
 
     createFlippedSprites() {
-        // Create horizontally flipped versions of all sprites for left-facing
+        // Create horizontally flipped versions for left-facing
         const spritesToFlip = ['wizard_idle', 'wizard_cast', 'staff'];
         
         spritesToFlip.forEach(spriteName => {
@@ -68,8 +70,34 @@ export class SpriteSystem {
         this.sprites.set('wizard_cast', canvas);
     }
 
+    createWizardFrontSprite() {
+        // Create front-facing wizard sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 40;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawWizardPixelArt(ctx, 16, 20, 'front');
+        
+        this.sprites.set('wizard_front', canvas);
+    }
+
+    createWizardBackSprite() {
+        // Create back-facing wizard sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 40;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawWizardPixelArt(ctx, 16, 20, 'back');
+        
+        this.sprites.set('wizard_back', canvas);
+    }
+
     createStaffSprite() {
-        // Create staff sprite separately for easier rotation
+        // Create staff sprite separately for easier rotation (horizontal aiming)
         const canvas = document.createElement('canvas');
         canvas.width = 24;
         canvas.height = 32;
@@ -81,13 +109,32 @@ export class SpriteSystem {
         this.sprites.set('staff', canvas);
     }
 
+    createVerticalStaffSprite() {
+        // Create vertical staff sprites for different animation frames
+        this.createVerticalStaffFrame('idle', 0);
+        this.createVerticalStaffFrame('cast1', 1);
+        this.createVerticalStaffFrame('cast2', 2);
+    }
+
+    createVerticalStaffFrame(frameName, frameIndex) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 12; // Narrower canvas
+        canvas.height = 40;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawVerticalStaffPixelArt(ctx, 6, 20, frameIndex); // Centered in narrower canvas
+        
+        this.sprites.set(`staff_vertical_${frameName}`, canvas);
+    }
+
     drawWizardPixelArt(ctx, centerX, centerY, pose = 'idle') {
         const pixel = (x, y, color, size = 1) => {
             ctx.fillStyle = color;
             ctx.fillRect(centerX + x, centerY + y, size, size);
         };
 
-        // Hat (dark gray/black)
+        // Hat (dark gray/black) - same for all directions
         pixel(-6, -18, '#2C2C2C', 2);
         pixel(-4, -18, '#2C2C2C', 2);
         pixel(-2, -18, '#2C2C2C', 2);
@@ -110,7 +157,7 @@ export class SpriteSystem {
         pixel(0, -14, '#FFD700');
         pixel(0, -15, '#FFD700');
 
-        // Face (peach)
+        // Face (peach) - same for all directions
         pixel(-4, -12, '#FFDBAC', 2);
         pixel(-2, -12, '#FFDBAC', 2);
         pixel(0, -12, '#FFDBAC', 2);
@@ -126,46 +173,71 @@ export class SpriteSystem {
         pixel(0, -8, '#FFDBAC', 2);
         pixel(2, -8, '#FFDBAC', 2);
 
-        // Eyes (adjusted to face right more clearly)
-        pixel(-2, -11, '#000000');
-        pixel(2, -11, '#000000');
+        // Eyes - different for each direction
+        if (pose === 'front') {
+            // Front-facing: both eyes visible, looking forward
+            pixel(-3, -11, '#000000');
+            pixel(-2, -11, '#000000');
+            pixel(1, -11, '#000000');
+            pixel(2, -11, '#000000');
+        } else if (pose === 'back') {
+            // Back-facing: no eyes visible (back of head)
+            // Add back-of-head hair detail instead
+            pixel(-3, -13, '#8B4513');
+            pixel(-1, -13, '#8B4513');
+            pixel(1, -13, '#8B4513');
+            pixel(3, -13, '#8B4513');
+        } else {
+            // Side view: eyes positioned for right-facing (will be flipped for left)
+            pixel(-2, -11, '#000000');
+            pixel(2, -11, '#000000');
+        }
 
-        // Beard (white/gray) - Enhanced and more prominent
-        pixel(-4, -6, '#E6E6E6');
-        pixel(-3, -6, '#E6E6E6');
-        pixel(-2, -6, '#E6E6E6');
-        pixel(-1, -6, '#E6E6E6');
-        pixel(0, -6, '#E6E6E6');
-        pixel(1, -6, '#E6E6E6');
-        pixel(2, -6, '#E6E6E6');
-        
-        pixel(-3, -4, '#E6E6E6');
-        pixel(-2, -4, '#E6E6E6');
-        pixel(-1, -4, '#E6E6E6');
-        pixel(0, -4, '#E6E6E6');
-        pixel(1, -4, '#E6E6E6');
-        pixel(2, -4, '#E6E6E6');
-        
-        pixel(-2, -2, '#E6E6E6');
-        pixel(-1, -2, '#E6E6E6');
-        pixel(0, -2, '#E6E6E6');
-        pixel(1, -2, '#E6E6E6');
-        
-        pixel(-1, 0, '#E6E6E6');
-        pixel(0, 0, '#E6E6E6');
-        
-        // Beard highlights for more definition
-        pixel(-3, -5, '#F0F0F0');
-        pixel(-1, -5, '#F0F0F0');
-        pixel(1, -5, '#F0F0F0');
-        pixel(-2, -3, '#F0F0F0');
-        pixel(0, -3, '#F0F0F0');
-        pixel(-1, -1, '#F0F0F0');
+        // Beard - enhanced for different poses
+        if (pose === 'back') {
+            // Minimal beard visible from back
+            pixel(-2, -6, '#E6E6E6');
+            pixel(-1, -6, '#E6E6E6');
+            pixel(0, -6, '#E6E6E6');
+            pixel(1, -6, '#E6E6E6');
+        } else {
+            // Full beard for front and side views
+            pixel(-4, -6, '#E6E6E6');
+            pixel(-3, -6, '#E6E6E6');
+            pixel(-2, -6, '#E6E6E6');
+            pixel(-1, -6, '#E6E6E6');
+            pixel(0, -6, '#E6E6E6');
+            pixel(1, -6, '#E6E6E6');
+            pixel(2, -6, '#E6E6E6');
+            
+            pixel(-3, -4, '#E6E6E6');
+            pixel(-2, -4, '#E6E6E6');
+            pixel(-1, -4, '#E6E6E6');
+            pixel(0, -4, '#E6E6E6');
+            pixel(1, -4, '#E6E6E6');
+            pixel(2, -4, '#E6E6E6');
+            
+            pixel(-2, -2, '#E6E6E6');
+            pixel(-1, -2, '#E6E6E6');
+            pixel(0, -2, '#E6E6E6');
+            pixel(1, -2, '#E6E6E6');
+            
+            pixel(-1, 0, '#E6E6E6');
+            pixel(0, 0, '#E6E6E6');
+            
+            // Beard highlights
+            pixel(-3, -5, '#F0F0F0');
+            pixel(-1, -5, '#F0F0F0');
+            pixel(1, -5, '#F0F0F0');
+            pixel(-2, -3, '#F0F0F0');
+            pixel(0, -3, '#F0F0F0');
+            pixel(-1, -1, '#F0F0F0');
+        }
 
         // Body/Robe - color will be applied dynamically
         const bodyColor = '#4169E1'; // Default blue, will be overridden
         
-        // Robe body
+        // Robe body - same for all directions
         pixel(-6, -4, bodyColor, 2);
         pixel(-4, -4, bodyColor, 2);
         pixel(-2, -4, bodyColor, 2);
@@ -205,18 +277,27 @@ export class SpriteSystem {
         pixel(4, 4, bodyColor, 2);
         pixel(6, 4, bodyColor, 2);
 
-        // Arms (adjusted for clearer right-facing orientation)
-        if (pose === 'cast') {
-            // Casting arm extended to the right
+        // Arms - different for each pose
+        if (pose === 'front') {
+            // Front view: both arms visible at sides
+            pixel(-8, -3, '#FFDBAC');
+            pixel(-7, -3, '#FFDBAC');
+            pixel(6, -3, '#FFDBAC');
+            pixel(7, -3, '#FFDBAC');
+        } else if (pose === 'back') {
+            // Back view: arms slightly visible at sides
+            pixel(-7, -2, '#FFDBAC');
+            pixel(6, -2, '#FFDBAC');
+        } else if (pose === 'cast') {
+            // Side casting: extended arm
             pixel(6, -6, '#FFDBAC');
             pixel(8, -6, '#FFDBAC');
             pixel(10, -6, '#FFDBAC');
-            // Left arm slightly back
             pixel(-6, -3, '#FFDBAC');
         } else {
-            // Idle arms - right arm more prominent (facing right)
-            pixel(-6, -2, '#FFDBAC'); // Left arm
-            pixel(6, -2, '#FFDBAC');  // Right arm (moved one pixel right)
+            // Side idle: arms at sides
+            pixel(-6, -2, '#FFDBAC');
+            pixel(6, -2, '#FFDBAC');
         }
     }
 
@@ -255,6 +336,64 @@ export class SpriteSystem {
         pixel(-1, -15, '#E6E6FA');
         pixel(0, -15, '#E6E6FA');
         pixel(1, -15, '#E6E6FA');
+    }
+
+    drawVerticalStaffPixelArt(ctx, centerX, centerY, frameIndex = 0) {
+        const pixel = (x, y, color, size = 1) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(centerX + x, centerY + y, size, size);
+        };
+
+        // Animation offsets for pulsing effect
+        const glowIntensity = frameIndex * 0.3; // 0, 0.3, 0.6 for frames 0, 1, 2
+        const orbOffset = Math.sin(frameIndex * Math.PI / 2) * 0.5; // Subtle vertical movement
+
+        // Vertical staff handle (brown) - thinner and more elegant
+        const handleY = Math.round(orbOffset);
+        pixel(0, -16 + handleY, '#8B4513');
+        pixel(0, -14 + handleY, '#8B4513');
+        pixel(0, -12 + handleY, '#8B4513');
+        pixel(0, -10 + handleY, '#8B4513');
+        pixel(0, -8 + handleY, '#8B4513');
+        pixel(0, -6 + handleY, '#8B4513');
+        pixel(0, -4 + handleY, '#8B4513');
+        pixel(0, -2 + handleY, '#8B4513');
+        pixel(0, 0 + handleY, '#8B4513');
+        pixel(0, 2 + handleY, '#8B4513');
+        pixel(0, 4 + handleY, '#8B4513');
+        pixel(0, 6 + handleY, '#8B4513');
+
+        // Elegant vertical staff orb (much smaller and more refined)
+        const orbY = Math.round(-18 + orbOffset);
+        
+        // Core orb (bright purple)
+        const coreColor = frameIndex === 1 ? '#B894F5' : '#9370DB'; // Brighter on cast frame 1
+        pixel(-1, orbY, coreColor);
+        pixel(0, orbY, coreColor);
+        pixel(1, orbY, coreColor);
+        pixel(0, orbY - 1, coreColor);
+        pixel(0, orbY + 1, coreColor);
+
+        // Outer glow effect for animation frames
+        if (frameIndex > 0) {
+            const glowColor = frameIndex === 2 ? '#DDA0DD' : '#C8A2C8'; // Different glow colors
+            // Subtle glow around orb
+            pixel(-2, orbY, glowColor);
+            pixel(2, orbY, glowColor);
+            pixel(0, orbY - 2, glowColor);
+            pixel(0, orbY + 2, glowColor);
+            
+            if (frameIndex === 2) {
+                // Extra glow for maximum cast frame
+                pixel(-1, orbY - 1, glowColor);
+                pixel(1, orbY - 1, glowColor);
+                pixel(-1, orbY + 1, glowColor);
+                pixel(1, orbY + 1, glowColor);
+            }
+        }
+
+        // Highlight on orb center for all frames
+        pixel(0, orbY, '#E6E6FA');
     }
 
     // Create colored version of wizard sprite
@@ -319,7 +458,85 @@ export class SpriteSystem {
             return this.sprites.get(baseName);
         }
         
+        if (name === 'staff_vertical') {
+            return this.sprites.get('staff_vertical');
+        }
+        
         return this.sprites.get(name);
+    }
+
+    // Get direction based on aiming angle (in radians)
+    getDirectionFromAngle(angle) {
+        // Normalize angle to 0-2π
+        angle = ((angle % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2);
+        
+        // Convert to degrees for easier calculation
+        const degrees = (angle * 180) / Math.PI;
+        
+        // Determine direction based on angle
+        if (degrees >= 315 || degrees < 45) {
+            return 'right';
+        } else if (degrees >= 45 && degrees < 135) {
+            return 'front'; // Changed from 'down' to 'front' for consistency
+        } else if (degrees >= 135 && degrees < 225) {
+            return 'left';
+        } else {
+            return 'back'; // Changed from 'up' to 'back' for consistency
+        }
+    }
+
+    // Get appropriate wizard sprite based on direction
+    getWizardSpriteForDirection(direction, color, pose) {
+        let spriteName;
+        let isFlipped = false;
+        
+        switch (direction) {
+            case 'left':
+                spriteName = `wizard_${pose === 'cast' ? 'cast' : 'idle'}`;
+                isFlipped = true;
+                break;
+            case 'right':
+                spriteName = `wizard_${pose === 'cast' ? 'cast' : 'idle'}`;
+                isFlipped = false;
+                break;
+            case 'back':
+                spriteName = 'wizard_back';
+                isFlipped = false;
+                break;
+            case 'front':
+                spriteName = 'wizard_front';
+                isFlipped = false;
+                break;
+            default:
+                spriteName = 'wizard_idle';
+                isFlipped = false;
+        }
+        
+        return this.createColoredWizardSprite(color, spriteName.replace('wizard_', ''), isFlipped);
+    }
+
+    // Get appropriate staff sprite based on direction
+    getStaffSpriteForDirection(direction, staffRotation = 0) {
+        switch (direction) {
+            case 'left':
+                return this.sprites.get('staff_left');
+            case 'right':
+                return this.sprites.get('staff');
+            case 'front':
+            case 'back':
+                // Use animated vertical staff based on cast state
+                if (Math.abs(staffRotation) > 0.15) { // Significant rotation means casting
+                    const rotationProgress = Math.abs(staffRotation) / (20 * Math.PI / 180); // Normalize to 0-1
+                    if (rotationProgress > 0.7) {
+                        return this.sprites.get('staff_vertical_cast2'); // Max cast frame
+                    } else if (rotationProgress > 0.3) {
+                        return this.sprites.get('staff_vertical_cast1'); // Mid cast frame
+                    }
+                }
+                return this.sprites.get('staff_vertical_idle'); // Idle frame
+            default:
+                return this.sprites.get('staff');
+        }
     }
 
     // Animation system for staff casting

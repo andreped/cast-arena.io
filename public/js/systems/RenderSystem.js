@@ -660,24 +660,27 @@ export class RenderSystem {
         const pose = this.spriteSystem.getCastPose(player.id);
         const staffRotation = this.spriteSystem.getStaffRotation(player.id);
         
-        // Get wizard sprite with player color (always get the right-facing version)
-        const wizardSprite = this.spriteSystem.getSprite('wizard', player.color, pose, false);
-        const staffSprite = this.spriteSystem.getSprite('staff', null, 'idle', false);
+        // Use aiming angle if available, otherwise fall back to facingLeft
+        let direction;
+        if (player.aimingAngle !== undefined) {
+            direction = this.spriteSystem.getDirectionFromAngle(player.aimingAngle);
+        } else {
+            direction = player.facingLeft ? 'left' : 'right';
+        }
+        
+        // Get directional wizard and staff sprites
+        const wizardSprite = this.spriteSystem.getWizardSpriteForDirection(direction, player.color, pose);
+        const staffSprite = this.spriteSystem.getStaffSpriteForDirection(direction, staffRotation);
         
         if (!wizardSprite || !staffSprite) return;
         
         // Position and scale
         const scale = 2; // Scale up pixel art for better visibility
         
-        // Move to player position and apply facing direction transformation
+        // Move to player position
         this.ctx.translate(player.x, player.y);
         
-        // Apply horizontal flip if facing left
-        if (player.facingLeft) {
-            this.ctx.scale(-1, 1);
-        }
-        
-        // Draw wizard sprite centered at origin
+        // Draw wizard sprite centered at origin (no horizontal flipping needed - sprites are pre-rendered for each direction)
         this.ctx.drawImage(
             wizardSprite,
             -(wizardSprite.width * scale) / 2,
@@ -686,16 +689,31 @@ export class RenderSystem {
             wizardSprite.height * scale
         );
         
-        // Draw staff with rotation for casting animation
-        // Staff position is relative to the wizard in local coordinates
+        // Draw staff at appropriate position based on direction
         this.ctx.save();
         
-        // Staff position (always to the right in local coordinates - flip handles the direction)
-        const staffX = 25; // Always positive - flip will handle left/right
-        const staffY = -5;
+        // Staff position varies by direction
+        let staffX, staffY;
+        if (direction === 'left') {
+            staffX = -25; // Staff on left side
+            staffY = -5;
+        } else if (direction === 'right') {
+            staffX = 25; // Staff on right side
+            staffY = -5;
+        } else if (direction === 'front') {
+            staffX = 15; // Staff slightly to the right when facing forward
+            staffY = 0;
+        } else { // back
+            staffX = -15; // Staff slightly to the left when facing away
+            staffY = 0;
+        }
         
         this.ctx.translate(staffX, staffY);
-        this.ctx.rotate(staffRotation);
+        
+        // For horizontal directions, apply rotation for casting animation
+        if (direction === 'left' || direction === 'right') {
+            this.ctx.rotate(staffRotation);
+        }
         
         this.ctx.drawImage(
             staffSprite,
@@ -719,7 +737,7 @@ export class RenderSystem {
 
     drawHealthBar(player) {
         const x = player.x;
-        const y = player.y - GAME_CONFIG.player.size - 20;
+        const y = player.y - GAME_CONFIG.player.size - 30;
         const width = 40;
         const height = 6;
 

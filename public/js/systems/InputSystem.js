@@ -100,6 +100,21 @@ export class InputSystem {
         
         this.mouseX = viewportX + this.game.camera.x;
         this.mouseY = viewportY + this.game.camera.y;
+        
+        // Update player's aiming angle based on mouse position
+        const player = this.game.players.get(this.game.myId);
+        if (player && this.game.canPlay()) {
+            const dx = this.mouseX - player.x;
+            const dy = this.mouseY - player.y;
+            const previousAngle = player.aimingAngle;
+            player.aimingAngle = Math.atan2(dy, dx);
+            
+            // Only send network update if angle changed significantly (avoid spam)
+            const angleDiff = Math.abs(player.aimingAngle - previousAngle);
+            if (angleDiff > 0.1 || angleDiff > Math.PI * 1.9) { // Handle angle wrap-around
+                this.game.network.sendMovement(player.getMovementData());
+            }
+        }
     }
 
     handleClick(e) {
@@ -232,6 +247,9 @@ export class InputSystem {
         const player = this.game.players.get(this.game.myId);
         const targetDistance = 1000;
 
+        // Update player's aiming angle for directional sprites
+        player.aimingAngle = angle;
+
         // Trigger casting animation
         this.game.renderer.spriteSystem.createCastAnimation(this.game.myId);
 
@@ -243,6 +261,7 @@ export class InputSystem {
             angle
         });
 
+        // Update facing direction and send movement data (including aiming angle)
         if (player.setFacing(normalizedDx)) {
             this.game.network.sendMovement(player.getMovementData());
         }

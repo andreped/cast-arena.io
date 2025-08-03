@@ -13,6 +13,7 @@ class Player {
         this.burnEndTime = 0;
         this.isAlive = true;
         this.facingLeft = false;
+        this.aimingAngle = 0; // Default aiming direction (right)
         this.hasSpawned = false;
         this.respawnImmunity = false;
         this.spawnProtection = false;
@@ -124,6 +125,7 @@ class Player {
             burnEndTime: this.burnEndTime,
             isAlive: this.isAlive,
             facingLeft: this.facingLeft,
+            aimingAngle: this.aimingAngle,
             currentSpeedMultiplier: this.currentSpeedMultiplier,
             speedBuffs: this.speedBuffs
         };

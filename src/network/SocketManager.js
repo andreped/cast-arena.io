@@ -53,6 +53,9 @@ class SocketManager {
             if (movementData.facingLeft !== undefined) {
                 player.facingLeft = movementData.facingLeft;
             }
+            if (movementData.aimingAngle !== undefined) {
+                player.aimingAngle = movementData.aimingAngle;
+            }
 
             // Check for item pickups at new position
             this.checkItemPickupsForPlayer(socket.id, player);
@@ -62,6 +65,7 @@ class SocketManager {
                 x: movementData.x,
                 y: movementData.y,
                 facingLeft: player.facingLeft,
+                aimingAngle: player.aimingAngle,
                 isAlive: player.isAlive
             });
         }
