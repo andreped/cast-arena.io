@@ -1057,21 +1057,25 @@ function updateSpell(spell) {
     
     // Check collision with players
     Object.values(players).forEach(player => {
-        // Skip caster and explicitly check isAlive status
-        // A player is only alive if isAlive is exactly true
+        // Only process hits on living players that aren't the caster
         if (player.id !== spell.casterId && player.isAlive === true) {
             const playerDx = player.x - spell.x;
             const playerDy = player.y - spell.y;
             const playerDistance = Math.sqrt(playerDx * playerDx + playerDy * playerDy);
             
             if (playerDistance < PLAYER_SIZE + SPELL_SIZE) {
-                // Register hit on this living player
+                // Hit detected
+                console.log('Hit detected:', {
+                    spellId: spell.id,
+                    targetId: player.id,
+                    distance: playerDistance,
+                    threshold: PLAYER_SIZE + SPELL_SIZE
+                });
+                
                 socket.emit('spellHit', {
                     spellId: spell.id,
                     targetId: player.id
                 });
-                
-                // Remove the spell when it hits any player
                 delete spells[spell.id];
             }
         }

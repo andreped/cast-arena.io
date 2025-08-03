@@ -77,9 +77,29 @@ class SocketManager {
         const target = this.gameState.getPlayer(targetId);
         const caster = this.gameState.getPlayer(spell?.casterId);
 
-        if (!this.validateSpellHit(spell, target, caster, targetId)) return;
+        // Debug validation state
+        const validationState = {
+            spellExists: !!spell,
+            targetExists: !!target,
+            casterExists: !!caster,
+            isDifferentPlayer: targetId !== (spell?.casterId),
+            noSpawnProtection: target?.spawnProtection === false,
+            targetIsAlive: target?.isAlive === true
+        };
+        
+        console.log('Spell hit validation:', validationState);
+
+        if (!this.validateSpellHit(spell, target, caster, targetId)) {
+            console.log('Spell hit validation failed:', validationState);
+            return;
+        }
 
         if (target.takeDamage(spell.damage)) {
+            console.log(`Player ${targetId} took damage:`, {
+                damage: spell.damage,
+                newHealth: target.health
+            });
+            
             this.gameState.applyBurnEffect(targetId);
             this.gameState.removeSpell(spellId);
 
