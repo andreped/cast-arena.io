@@ -2,6 +2,7 @@ import { GAME_CONFIG } from './config/gameConfig.js';
 import { Player } from './entities/Player.js';
 import { Spell } from './entities/Spell.js';
 import { Wall } from './entities/Wall.js';
+import { SpeedItem } from './entities/SpeedItem.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { RenderSystem } from './systems/RenderSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
@@ -18,6 +19,7 @@ export class Game {
         this.players = new Map();
         this.spells = new Map();
         this.walls = new Map();
+        this.items = new Map();
         this.myId = null;
         this.isDead = false;
         
@@ -115,6 +117,37 @@ export class Game {
             }
         }
         return null;
+    }
+
+    // Item management methods
+    addItem(itemData) {
+        const item = new SpeedItem(itemData);
+        this.items.set(item.id, item);
+    }
+
+    setItems(itemsData) {
+        this.items.clear();
+        Object.values(itemsData).forEach(itemData => {
+            this.addItem(itemData);
+        });
+    }
+
+    removeItem(itemId) {
+        this.items.delete(itemId);
+    }
+
+    checkItemPickup() {
+        if (!this.canPlay()) return;
+        
+        const player = this.players.get(this.myId);
+        if (!player) return;
+
+        for (const [itemId, item] of this.items) {
+            if (item.isCollidingWithPlayer(player.x, player.y)) {
+                // Item will be picked up on server side
+                break;
+            }
+        }
     }
 
     canPlay() {

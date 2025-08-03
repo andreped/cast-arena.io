@@ -1,6 +1,7 @@
 const Player = require('../entities/Player');
 const Spell = require('../entities/Spell');
 const WallSystem = require('./WallSystem');
+const ItemSystem = require('./ItemSystem');
 const gameConfig = require('../../config/gameConfig');
 
 class GameState {
@@ -9,6 +10,7 @@ class GameState {
         this.spells = new Map();
         this.burnEffects = new Map();
         this.wallSystem = new WallSystem();
+        this.itemSystem = new ItemSystem(this);
     }
 
     addPlayer(socketId) {
@@ -81,6 +83,27 @@ class GameState {
 
     checkWallLineCollision(x1, y1, x2, y2) {
         return this.wallSystem.checkLineCollision(x1, y1, x2, y2);
+    }
+
+    // Update all game systems
+    update() {
+        // Update player buffs
+        for (const [id, player] of this.players) {
+            player.updateSpeedBuffs();
+        }
+
+        // Update item system (spawning, pickups, etc.)
+        this.itemSystem.update();
+    }
+
+    // Get current items state
+    getItemsState() {
+        return this.itemSystem.getAllItems();
+    }
+
+    // Handle item pickup
+    pickupItem(playerId, itemId) {
+        return this.itemSystem.pickupItem(playerId, itemId);
     }
 }
 

@@ -212,22 +212,24 @@ export class InputSystem {
         let moved = false;
         let newX = player.x;
         let newY = player.y;
+        
+        const effectiveSpeed = player.getEffectiveSpeed();
 
         if (this.keys.w || this.keys.ArrowUp) {
-            newY -= GAME_CONFIG.player.speed;
+            newY -= effectiveSpeed;
             moved = true;
         }
         if (this.keys.s || this.keys.ArrowDown) {
-            newY += GAME_CONFIG.player.speed;
+            newY += effectiveSpeed;
             moved = true;
         }
         if (this.keys.a || this.keys.ArrowLeft) {
-            newX -= GAME_CONFIG.player.speed;
+            newX -= effectiveSpeed;
             moved = true;
             if (player.setFacing(-1)) moved = true;
         }
         if (this.keys.d || this.keys.ArrowRight) {
-            newX += GAME_CONFIG.player.speed;
+            newX += effectiveSpeed;
             moved = true;
             if (player.setFacing(1)) moved = true;
         }
@@ -236,8 +238,8 @@ export class InputSystem {
             const moveThreshold = 0.1;
             if (Math.abs(this.joystickDirection.x) > moveThreshold || 
                 Math.abs(this.joystickDirection.y) > moveThreshold) {
-                newX += this.joystickDirection.x * GAME_CONFIG.player.speed * 1.5;
-                newY += this.joystickDirection.y * GAME_CONFIG.player.speed * 1.5;
+                newX += this.joystickDirection.x * effectiveSpeed * 1.5;
+                newY += this.joystickDirection.y * effectiveSpeed * 1.5;
                 moved = true;
             }
         }

@@ -16,6 +16,8 @@ class Player {
         this.hasSpawned = false;
         this.respawnImmunity = false;
         this.spawnProtection = false;
+        this.speedBuffs = []; // Array to track multiple speed buffs
+        this.currentSpeedMultiplier = 1.0;
     }
 
     getRandomColor() {
@@ -66,6 +68,49 @@ class Player {
         return true;
     }
 
+    addSpeedBuff(speedMultiplier, duration) {
+        const currentTime = Date.now();
+        const buff = {
+            multiplier: speedMultiplier,
+            endTime: currentTime + duration,
+            createdAt: currentTime
+        };
+        
+        this.speedBuffs.push(buff);
+        this.updateSpeedMultiplier();
+        
+        console.log(`Player ${this.id} now has ${this.speedBuffs.length} speed buff(s), total multiplier: ${this.currentSpeedMultiplier}`);
+    }
+
+    updateSpeedBuffs() {
+        const currentTime = Date.now();
+        const initialLength = this.speedBuffs.length;
+        
+        // Remove expired buffs
+        this.speedBuffs = this.speedBuffs.filter(buff => buff.endTime > currentTime);
+        
+        // Update speed multiplier if buffs changed
+        if (this.speedBuffs.length !== initialLength) {
+            this.updateSpeedMultiplier();
+        }
+    }
+
+    updateSpeedMultiplier() {
+        // Calculate total speed multiplier from all active buffs
+        this.currentSpeedMultiplier = 1.0;
+        
+        for (const buff of this.speedBuffs) {
+            this.currentSpeedMultiplier += buff.multiplier;
+        }
+        
+        // Cap the maximum speed boost (optional - prevent crazy speeds)
+        this.currentSpeedMultiplier = Math.min(this.currentSpeedMultiplier, 3.0); // Max 3x speed
+    }
+
+    getEffectiveSpeed() {
+        return gameConfig.player.speed * this.currentSpeedMultiplier;
+    }
+
     toJSON() {
         return {
             id: this.id,
@@ -78,7 +123,9 @@ class Player {
             isBurning: this.isBurning,
             burnEndTime: this.burnEndTime,
             isAlive: this.isAlive,
-            facingLeft: this.facingLeft
+            facingLeft: this.facingLeft,
+            currentSpeedMultiplier: this.currentSpeedMultiplier,
+            speedBuffs: this.speedBuffs
         };
     }
 }

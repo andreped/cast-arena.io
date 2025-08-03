@@ -25,6 +25,7 @@ class SocketManager {
         
         socket.emit('currentPlayers', this.gameState.getCurrentState());
         socket.emit('wallData', this.gameState.getWallState());
+        socket.emit('itemsUpdate', this.gameState.getItemsState());
         socket.broadcast.emit('newPlayer', player.toJSON());
         
         // Use safe spawn position

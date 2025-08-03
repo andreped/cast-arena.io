@@ -18,6 +18,7 @@ export class RenderSystem {
         this.drawWorldBoundaries();
         this.drawWalls();
         this.drawGrid();
+        this.drawItems();
         this.drawSpells();
         this.drawPlayers();
         
@@ -266,6 +267,63 @@ export class RenderSystem {
                 }
             }
         }
+    }
+
+    drawItems() {
+        this.game.items.forEach(item => {
+            if (item.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                this.drawItem(item);
+            }
+        });
+    }
+
+    drawItem(item) {
+        this.ctx.save();
+        
+        const time = Date.now() * 0.005; // Slow animation
+        const bounce = Math.sin(time + item.animationOffset) * 3; // Small bounce effect
+        const pulse = 0.8 + Math.sin(time * 2 + item.animationOffset) * 0.2; // Pulsing size
+        
+        this.ctx.translate(item.x, item.y + bounce);
+        this.ctx.scale(pulse, pulse);
+
+        if (item.type === 'speed') {
+            // Draw speed boost item as a lightning bolt-like icon
+            const size = item.size;
+            
+            // Outer glow
+            this.ctx.shadowColor = '#FFD700';
+            this.ctx.shadowBlur = 15;
+            this.ctx.shadowOffsetX = 0;
+            this.ctx.shadowOffsetY = 0;
+            
+            // Main body - bright yellow/gold
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.beginPath();
+            this.ctx.moveTo(-size * 0.3, -size * 0.8);
+            this.ctx.lineTo(size * 0.2, -size * 0.2);
+            this.ctx.lineTo(-size * 0.1, -size * 0.1);
+            this.ctx.lineTo(size * 0.3, size * 0.8);
+            this.ctx.lineTo(-size * 0.2, size * 0.2);
+            this.ctx.lineTo(size * 0.1, size * 0.1);
+            this.ctx.closePath();
+            this.ctx.fill();
+            
+            // Inner highlight
+            this.ctx.shadowBlur = 0;
+            this.ctx.fillStyle = '#FFFF99';
+            this.ctx.beginPath();
+            this.ctx.moveTo(-size * 0.2, -size * 0.6);
+            this.ctx.lineTo(size * 0.1, -size * 0.3);
+            this.ctx.lineTo(-size * 0.05, -size * 0.2);
+            this.ctx.lineTo(size * 0.2, size * 0.6);
+            this.ctx.lineTo(-size * 0.1, size * 0.3);
+            this.ctx.lineTo(size * 0.05, size * 0.2);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        this.ctx.restore();
     }
 
     drawSpells() {
