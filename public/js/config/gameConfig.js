@@ -23,6 +23,11 @@ export const GAME_CONFIG = {
     mobile: {
         fireDelay: 300
     },
+    server: {
+        tickRate: 20, // Server updates per second (20 TPS = 50ms intervals)
+        maxTickRate: 60, // Maximum for high-performance mode
+        networkUpdateRate: 30 // Network broadcasts per second
+    },
     grid: {
         size: 40,
         opacity: 0.1

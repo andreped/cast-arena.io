@@ -5,7 +5,14 @@ class SocketManager {
         this.io = io;
         this.gameState = gameState;
         this.burnSystem = burnSystem;
+        
+        // Server performance monitoring
+        this.tickCount = 0;
+        this.lastTpsTime = Date.now();
+        this.currentTps = 0;
+        
         this.setupSocketHandlers();
+        this.startTpsMonitoring();
     }
 
     setupSocketHandlers() {
@@ -64,6 +71,7 @@ class SocketManager {
             // Check for item pickups at new position
             this.checkItemPickupsForPlayer(socket.id, player);
 
+            // Broadcast to other players
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
                 x: movementData.x,
@@ -72,6 +80,17 @@ class SocketManager {
                 aimingAngle: player.aimingAngle,
                 isAlive: player.isAlive
             });
+
+            // Send reconciliation data back to the client with sequence number
+            if (movementData.sequence) {
+                socket.emit('playerMoved', {
+                    id: socket.id,
+                    x: player.x,
+                    y: player.y,
+                    sequence: movementData.sequence,
+                    timestamp: Date.now()
+                });
+            }
         }
     }
 
@@ -290,6 +309,41 @@ class SocketManager {
                 this.emitManaUpdate(player);
             }
         }
+    }
+
+    // Server performance monitoring
+    startTpsMonitoring() {
+        // Get target TPS from environment or default to 20
+        this.targetTps = process.env.SERVER_TPS ? parseInt(process.env.SERVER_TPS) : 20;
+        
+        // Calculate TPS every second and broadcast to clients
+        setInterval(() => {
+            const now = Date.now();
+            this.currentTps = Math.round(this.tickCount * 1000 / (now - this.lastTpsTime));
+            
+            // Broadcast TPS to all connected clients with target info
+            this.io.emit('serverTps', { 
+                tps: this.currentTps,
+                target: this.targetTps
+            });
+            
+            // Reset counters
+            this.tickCount = 0;
+            this.lastTpsTime = now;
+            
+            // Log performance issues with target comparison
+            const tpsEfficiency = (this.currentTps / this.targetTps) * 100;
+            if (this.currentTps < this.targetTps * 0.8) { // Less than 80% of target
+                console.warn(`⚠️ Low server TPS: ${this.currentTps}/${this.targetTps} (${tpsEfficiency.toFixed(1)}%)`);
+            } else if (this.currentTps > this.targetTps * 1.1) { // More than 110% of target
+                console.log(`🚀 High server TPS: ${this.currentTps}/${this.targetTps} (${tpsEfficiency.toFixed(1)}%)`);
+            }
+        }, 1000);
+    }
+
+    // Call this method for each server tick/update
+    registerTick() {
+        this.tickCount++;
     }
 
     checkItemPickupsForPlayer(playerId, player) {

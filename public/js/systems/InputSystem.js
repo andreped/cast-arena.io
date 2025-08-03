@@ -22,6 +22,39 @@ export class InputSystem {
         this.joystickDirection = { x: 0, y: 0 };
         this.lastFireTime = 0;
 
+        // Client-side prediction and reconciliation
+        this.inputSequence = 0;
+        this.pendingInputs = new Map(); // Store pending inputs for reconciliation
+        this.lastServerUpdate = 0;
+        this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
+
+        // Debug logging for production
+        this.debugMode = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        this.debugStats = {
+            totalInputs: 0,
+            reconciliations: 0,
+            largestDelta: 0,
+            avgLatency: 0,
+            networkUpdates: 0
+        };
+        this.debugLog = [];
+        this.maxDebugLogs = 100;
+
+        // FPS monitoring
+        this.frameCount = 0;
+        this.lastFpsTime = performance.now();
+        this.currentFps = 0;
+        this.frameTimes = [];
+        this.maxFrameTimeHistory = 60; // Keep last 60 frame times
+        this.serverTps = 0; // Server ticks per second
+        this.targetTps = 20; // Expected server TPS
+        
+        // Enhanced FPS debugging
+        this.fpsHistory = [];
+        this.maxFpsHistory = 100;
+        this.lowFpsThreshold = 40;
+        this.consecutiveLowFps = 0;
+
         // Store bound event handlers for cleanup
         this.boundHandlers = {
             keyDown: this.handleKeyDown.bind(this),
@@ -38,6 +71,19 @@ export class InputSystem {
         if (this.isMobile) {
             this.initMobileControls();
         }
+
+        // Initialize debug tools
+        this.exposeDebugToConsole();
+        if (this.debugMode) {
+            this.addDebugLog('🚀 InputSystem initialized in DEBUG mode');
+            this.initDebugOverlay();
+        }
+        
+        // Always initialize FPS monitor
+        this.initFpsMonitor();
+        
+        // Immediate FPS diagnosis
+        this.runImmediateFpsDiagnosis();
     }
 
     setupEventListeners() {
@@ -277,6 +323,9 @@ export class InputSystem {
     }
 
     update(deltaTime) {
+        // Calculate FPS
+        this.calculateFPS(deltaTime);
+        
         if (!this.game.canPlay()) return;
         
         const player = this.game.players.get(this.game.myId);
@@ -320,44 +369,463 @@ export class InputSystem {
         }
 
         if (moved) {
-            // Efficient wall sliding implementation
+            // Client-side prediction with reconciliation
             const playerRadius = GAME_CONFIG.player.size;
+            let finalX = player.x;
+            let finalY = player.y;
             
-            // First, try the full movement
+            // First, try the full movement (client prediction)
             if (!this.game.checkWallCollision(newX, newY, playerRadius)) {
                 // No collision - apply full movement
-                newX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newX));
-                newY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newY));
-                
-                player.move(newX, newY);
-                this.game.network.sendMovement(player.getMovementData());
+                finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newX));
+                finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newY));
             } else {
                 // Collision detected - try sliding
-                let slideX = player.x;
-                let slideY = player.y;
                 let didSlide = false;
                 
                 // Try horizontal movement only
                 if (newX !== player.x && !this.game.checkWallCollision(newX, player.y, playerRadius)) {
-                    slideX = newX;
+                    finalX = newX;
                     didSlide = true;
                 }
                 
                 // Try vertical movement only
                 if (newY !== player.y && !this.game.checkWallCollision(player.x, newY, playerRadius)) {
-                    slideY = newY;
+                    finalY = newY;
                     didSlide = true;
                 }
                 
                 if (didSlide) {
                     // Apply world boundaries
-                    slideX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, slideX));
-                    slideY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, slideY));
-                    
-                    player.move(slideX, slideY);
-                    this.game.network.sendMovement(player.getMovementData());
+                    finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, finalX));
+                    finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, finalY));
                 }
             }
+            
+            // Only update if position actually changed
+            if (finalX !== player.x || finalY !== player.y) {
+                // Store input for potential reconciliation
+                this.inputSequence++;
+                this.debugStats.totalInputs++;
+                
+                const inputData = {
+                    timestamp: performance.now(),
+                    x: finalX,
+                    y: finalY,
+                    inputX: newX,
+                    inputY: newY
+                };
+                
+                this.pendingInputs.set(this.inputSequence, inputData);
+                
+                // Debug logging
+                if (this.debugMode) {
+                    this.addDebugLog(`INPUT #${this.inputSequence}: (${finalX.toFixed(1)}, ${finalY.toFixed(1)}) - Pending: ${this.pendingInputs.size}`);
+                }
+                
+                // Clean old pending inputs (older than 1 second)
+                const now = performance.now();
+                for (const [seq, input] of this.pendingInputs) {
+                    if (now - input.timestamp > 1000) {
+                        this.pendingInputs.delete(seq);
+                    }
+                }
+                
+                // Apply movement immediately (client prediction)
+                player.move(finalX, finalY);
+                
+                // Send to server with sequence number
+                const movementData = player.getMovementData();
+                movementData.sequence = this.inputSequence;
+                this.debugStats.networkUpdates++;
+                this.game.network.sendMovement(movementData);
+            }
         }
+    }
+
+    // Handle server position reconciliation
+    handleServerReconciliation(serverData) {
+        const player = this.game.players.get(this.game.myId);
+        if (!player || !serverData.sequence) return;
+
+        // Check if we have the corresponding input
+        const pendingInput = this.pendingInputs.get(serverData.sequence);
+        if (!pendingInput) {
+            if (this.debugMode) {
+                this.addDebugLog(`⚠️ MISSING INPUT for sequence ${serverData.sequence}`);
+            }
+            return;
+        }
+
+        // Calculate latency
+        const latency = performance.now() - pendingInput.timestamp;
+        this.debugStats.avgLatency = (this.debugStats.avgLatency + latency) / 2;
+
+        // Calculate difference between client prediction and server position
+        const deltaX = Math.abs(player.x - serverData.x);
+        const deltaY = Math.abs(player.y - serverData.y);
+        const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        // Track largest delta for debugging
+        if (totalDelta > this.debugStats.largestDelta) {
+            this.debugStats.largestDelta = totalDelta;
+        }
+
+        // Debug logging
+        if (this.debugMode || window.location.hostname === 'localhost') {
+            this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
+            
+            if (totalDelta > this.reconciliationThreshold) {
+                this.addDebugLog(`🔄 CORRECTING position by ${totalDelta.toFixed(1)}px`);
+                console.log(`Jiggle detected: Client(${player.x.toFixed(1)}, ${player.y.toFixed(1)}) vs Server(${serverData.x.toFixed(1)}, ${serverData.y.toFixed(1)})`);
+            }
+        }
+
+        // Only reconcile if difference is significant AND player isn't actively moving
+        const isMoving = this.keys.w || this.keys.s || this.keys.a || this.keys.d || 
+                         this.keys.ArrowUp || this.keys.ArrowDown || this.keys.ArrowLeft || this.keys.ArrowRight ||
+                         (this.isMobile && this.joystickActive);
+        
+        if (totalDelta > this.reconciliationThreshold && !isMoving) {
+            this.debugStats.reconciliations++;
+            // Smoothly interpolate to server position over a few frames
+            this.reconcilePosition(player, serverData.x, serverData.y);
+        } else if (totalDelta > this.reconciliationThreshold && isMoving) {
+            console.log(`Skipping reconciliation - player is moving (Δ=${totalDelta.toFixed(1)}px)`);
+        }
+
+        // Remove processed input and older ones
+        for (const [seq, input] of this.pendingInputs) {
+            if (seq <= serverData.sequence) {
+                this.pendingInputs.delete(seq);
+            }
+        }
+    }
+
+    reconcilePosition(player, targetX, targetY) {
+        // Much smoother interpolation to reduce visible jiggling
+        const lerpFactor = 0.1; // Reduced from 0.3 for smoother correction
+        const deltaX = targetX - player.x;
+        const deltaY = targetY - player.y;
+        
+        // Only apply correction if it's significant enough to be worth the visual disruption
+        const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        if (totalDelta > 0.5) { // Don't correct tiny differences
+            player.x += deltaX * lerpFactor;
+            player.y += deltaY * lerpFactor;
+        }
+    }
+
+    // Debug utilities
+    addDebugLog(message) {
+        const timestamp = new Date().toISOString().substr(11, 12);
+        this.debugLog.push(`[${timestamp}] ${message}`);
+        if (this.debugLog.length > this.maxDebugLogs) {
+            this.debugLog.shift();
+        }
+        console.log(`[InputSystem] ${message}`);
+    }
+
+    getDebugInfo() {
+        return {
+            ...this.debugStats,
+            pendingInputs: this.pendingInputs.size,
+            recentLogs: this.debugLog.slice(-10),
+            reconciliationRate: this.debugStats.totalInputs > 0 ? 
+                (this.debugStats.reconciliations / this.debugStats.totalInputs * 100).toFixed(1) + '%' : '0%'
+        };
+    }
+
+    // Expose debug functions to window for console access
+    exposeDebugToConsole() {
+        if (this.debugMode) {
+            window.inputDebug = {
+                stats: () => this.getDebugInfo(),
+                logs: () => this.debugLog,
+                clearLogs: () => { this.debugLog = []; },
+                setThreshold: (pixels) => { this.reconciliationThreshold = pixels; },
+                enableVerbose: () => { this.verboseDebug = true; },
+                disableVerbose: () => { this.verboseDebug = false; }
+            };
+            console.log('🔧 Debug tools available: inputDebug.stats(), inputDebug.logs(), etc.');
+        }
+    }
+
+    initDebugOverlay() {
+        const overlay = document.getElementById('debugOverlay');
+        if (overlay) {
+            overlay.style.display = 'block';
+            
+            // Update overlay every 500ms
+            setInterval(() => this.updateDebugOverlay(), 500);
+            
+            // Toggle with Ctrl+D
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'd') {
+                    e.preventDefault();
+                    overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+                }
+            });
+        }
+    }
+
+    updateDebugOverlay() {
+        const statsEl = document.getElementById('debugStats');
+        const logsEl = document.getElementById('debugLogs');
+        
+        if (statsEl && logsEl) {
+            const stats = this.getDebugInfo();
+            statsEl.innerHTML = `
+                Inputs: ${stats.totalInputs} | Reconciles: ${stats.reconciliations} (${stats.reconciliationRate})<br>
+                Pending: ${stats.pendingInputs} | Max Δ: ${stats.largestDelta.toFixed(1)}px<br>
+                Avg Latency: ${stats.avgLatency.toFixed(1)}ms | Network: ${stats.networkUpdates}
+            `;
+            
+            logsEl.innerHTML = stats.recentLogs.map(log => `<div>${log}</div>`).join('');
+            logsEl.scrollTop = logsEl.scrollHeight;
+        }
+        
+        // Update FPS display
+        this.updateFpsDisplay();
+    }
+
+    calculateFPS(deltaTime) {
+        const now = performance.now();
+        this.frameCount++;
+        
+        // Store frame time for average calculation
+        this.frameTimes.push(deltaTime);
+        if (this.frameTimes.length > this.maxFrameTimeHistory) {
+            this.frameTimes.shift();
+        }
+        
+        // Calculate FPS every second
+        if (now - this.lastFpsTime >= 1000) {
+            this.currentFps = Math.round(this.frameCount * 1000 / (now - this.lastFpsTime));
+            
+            // Store FPS history
+            this.fpsHistory.push(this.currentFps);
+            if (this.fpsHistory.length > this.maxFpsHistory) {
+                this.fpsHistory.shift();
+            }
+            
+            // Debug low FPS
+            if (this.currentFps < this.lowFpsThreshold) {
+                this.consecutiveLowFps++;
+                if (this.consecutiveLowFps >= 3) {
+                    console.warn(`🐌 Low FPS detected: ${this.currentFps} FPS for ${this.consecutiveLowFps} seconds`);
+                    this.diagnoseFpsIssue();
+                }
+            } else {
+                this.consecutiveLowFps = 0;
+            }
+            
+            this.frameCount = 0;
+            this.lastFpsTime = now;
+        }
+    }
+
+    updateFpsDisplay() {
+        const clientFpsEl = document.getElementById('clientFps');
+        const serverTpsEl = document.getElementById('serverTps');
+        const frameTimeEl = document.getElementById('frameTime');
+        
+        if (clientFpsEl && serverTpsEl && frameTimeEl) {
+            // Update client FPS with color coding
+            const fpsColor = this.getFpsColor(this.currentFps);
+            clientFpsEl.innerHTML = `Client: <span style="color: ${fpsColor};">${this.currentFps} FPS</span>`;
+            
+            // Update server TPS
+            const tpsColor = this.getTpsColor(this.serverTps);
+            const tpsEfficiency = this.targetTps > 0 ? (this.serverTps / this.targetTps * 100).toFixed(0) : 100;
+            serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${this.serverTps}/${this.targetTps} TPS</span> <span style="color: #888; font-size: 10px;">(${tpsEfficiency}%)</span>`;
+            
+            // Update average frame time
+            const avgFrameTime = this.frameTimes.length > 0 ? 
+                this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length : 0;
+            const frameColor = this.getFrameTimeColor(avgFrameTime);
+            frameTimeEl.innerHTML = `Frame: <span style="color: ${frameColor};">${avgFrameTime.toFixed(1)}ms</span>`;
+        }
+    }
+
+    getFpsColor(fps) {
+        if (fps >= 50) return '#00ff00';      // Green - Good
+        if (fps >= 30) return '#ffaa00';      // Orange - OK
+        if (fps >= 20) return '#ff6600';      // Red-Orange - Poor
+        return '#ff0000';                     // Red - Bad
+    }
+
+    getTpsColor(tps) {
+        if (tps >= 18) return '#00ff00';      // Green - Good (server target is usually 20)
+        if (tps >= 15) return '#ffaa00';      // Orange - OK
+        if (tps >= 10) return '#ff6600';      // Red-Orange - Poor
+        return '#ff0000';                     // Red - Bad
+    }
+
+    getFrameTimeColor(frameTime) {
+        if (frameTime <= 16.67) return '#00ff00';  // Green - 60 FPS
+        if (frameTime <= 33.33) return '#ffaa00';  // Orange - 30 FPS
+        if (frameTime <= 50) return '#ff6600';     // Red-Orange - 20 FPS
+        return '#ff0000';                          // Red - <20 FPS
+    }
+
+    // Method to receive server TPS from network
+    updateServerTps(tps) {
+        this.serverTps = tps;
+    }
+
+    initFpsMonitor() {
+        // Update FPS display every 200ms for smooth updates
+        setInterval(() => this.updateFpsDisplay(), 200);
+        
+        // Toggle FPS monitor with F key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'f' || e.key === 'F') {
+                const monitor = document.getElementById('fpsMonitor');
+                if (monitor) {
+                    monitor.style.display = monitor.style.display === 'none' ? 'block' : 'none';
+                }
+            }
+            
+            // Debug FPS with Shift+F
+            if (e.shiftKey && (e.key === 'f' || e.key === 'F')) {
+                e.preventDefault();
+                this.printFpsDebugInfo();
+            }
+        });
+    }
+
+    diagnoseFpsIssue() {
+        const issues = [];
+        
+        // Check if tab is visible
+        if (document.hidden) {
+            issues.push("Tab is in background (browser throttling)");
+        }
+        
+        // Check average frame time
+        const avgFrameTime = this.frameTimes.length > 0 ? 
+            this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length : 0;
+        
+        if (avgFrameTime > 33) {
+            issues.push(`High frame time: ${avgFrameTime.toFixed(1)}ms (should be ~16ms for 60fps)`);
+        }
+        
+        // Check requestAnimationFrame timing
+        let rafTime = performance.now();
+        requestAnimationFrame(() => {
+            const rafDelta = performance.now() - rafTime;
+            if (rafDelta > 20) {
+                console.warn(`⏱️ requestAnimationFrame delayed: ${rafDelta.toFixed(1)}ms`);
+            }
+        });
+        
+        // Check for performance issues
+        const memInfo = performance.memory;
+        if (memInfo && memInfo.usedJSHeapSize > 100000000) { // >100MB
+            issues.push(`High memory usage: ${(memInfo.usedJSHeapSize / 1024 / 1024).toFixed(1)}MB`);
+        }
+        
+        if (issues.length > 0) {
+            console.warn("🔍 FPS Issues detected:", issues);
+        }
+        
+        return issues;
+    }
+
+    printFpsDebugInfo() {
+        const avgFps = this.fpsHistory.length > 0 ? 
+            this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length : 0;
+        
+        const minFps = Math.min(...this.fpsHistory);
+        const maxFps = Math.max(...this.fpsHistory);
+        
+        console.log("📊 FPS Debug Info:");
+        console.log(`Current: ${this.currentFps} FPS`);
+        console.log(`Average: ${avgFps.toFixed(1)} FPS`);
+        console.log(`Range: ${minFps}-${maxFps} FPS`);
+        console.log(`Tab visible: ${!document.hidden}`);
+        console.log(`Browser: ${navigator.userAgent.split(' ').slice(-2).join(' ')}`);
+        
+        // Check if game loop is the issue
+        console.log("🔧 To test game loop performance, run: window.testGameLoop()");
+        window.testGameLoop = this.testGameLoopPerformance.bind(this);
+    }
+
+    testGameLoopPerformance() {
+        console.log("🧪 Testing game loop performance...");
+        const iterations = 1000;
+        const start = performance.now();
+        
+        // Simulate game loop without rendering
+        for (let i = 0; i < iterations; i++) {
+            // Simulate typical update operations
+            const deltaTime = 16.67; // 60 FPS
+            // Mock player update
+            const mockPlayer = { x: 100, y: 100, getEffectiveSpeed: () => 5 };
+            const newX = mockPlayer.x + 1;
+            const newY = mockPlayer.y + 1;
+        }
+        
+        const end = performance.now();
+        const totalTime = end - start;
+        const avgTimePerIteration = totalTime / iterations;
+        
+        console.log(`⏱️ ${iterations} iterations took ${totalTime.toFixed(2)}ms`);
+        console.log(`📈 Average: ${avgTimePerIteration.toFixed(4)}ms per iteration`);
+        console.log(`🎯 Target: <0.016ms per iteration for 60fps`);
+        
+        if (avgTimePerIteration > 0.016) {
+            console.warn("⚠️ Game loop may be too heavy for 60fps");
+        } else {
+            console.log("✅ Game loop performance looks good");
+        }
+    }
+
+    runImmediateFpsDiagnosis() {
+        console.log("🚀 Running immediate FPS diagnosis...");
+        
+        // Check basic browser info
+        console.log(`Browser: ${navigator.userAgent}`);
+        console.log(`Tab visible: ${!document.hidden}`);
+        console.log(`Hardware concurrency: ${navigator.hardwareConcurrency} cores`);
+        
+        // Check if canvas exists and size
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+            console.log(`Canvas size: ${canvas.width}x${canvas.height}`);
+            console.log(`Canvas CSS size: ${canvas.style.width}x${canvas.style.height}`);
+        }
+        
+        // Test requestAnimationFrame timing
+        let rafCount = 0;
+        let rafStart = performance.now();
+        
+        const testRaf = () => {
+            rafCount++;
+            if (rafCount >= 60) { // Test for 1 second at 60fps
+                const elapsed = performance.now() - rafStart;
+                const actualFps = rafCount * 1000 / elapsed;
+                console.log(`🎯 requestAnimationFrame test: ${actualFps.toFixed(1)} FPS over ${elapsed.toFixed(0)}ms`);
+                
+                if (actualFps < 50) {
+                    console.warn("⚠️ Browser is throttling requestAnimationFrame!");
+                    console.warn("💡 Common causes:");
+                    console.warn("  - Tab in background");
+                    console.warn("  - Browser power saving mode");
+                    console.warn("  - Low battery mode");
+                    console.warn("  - Hardware limitations");
+                }
+            } else {
+                requestAnimationFrame(testRaf);
+            }
+        };
+        
+        requestAnimationFrame(testRaf);
+        
+        // Check visibility API
+        document.addEventListener('visibilitychange', () => {
+            console.log(`👁️ Tab visibility changed: ${document.hidden ? 'hidden' : 'visible'}`);
+        });
     }
 }

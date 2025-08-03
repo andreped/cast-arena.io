@@ -35,6 +35,7 @@ export class NetworkSystem {
         this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
         this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
         this.socket.on('manaUpdate', this.handleManaUpdate.bind(this));
+        this.socket.on('serverTps', this.handleServerTps.bind(this));
         
         // Throttling for movement updates
         this.lastMovementUpdate = 0;
@@ -76,8 +77,9 @@ export class NetworkSystem {
     }
 
     handlePlayerMoved(data) {
-        // Skip updating local player position to avoid jittering from server corrections
+        // Handle server reconciliation for local player
         if (data.id === this.game.myId) {
+            this.game.inputSystem.handleServerReconciliation(data);
             return;
         }
         
@@ -241,5 +243,16 @@ export class NetworkSystem {
 
     castSpell(spellData) {
         this.socket.emit('castSpell', spellData);
+    }
+
+    handleServerTps(data) {
+        // Forward server TPS to input system for display
+        if (this.game.inputSystem && typeof this.game.inputSystem.updateServerTps === 'function') {
+            this.game.inputSystem.updateServerTps(data.tps);
+            // Update target TPS if provided
+            if (data.target) {
+                this.game.inputSystem.targetTps = data.target;
+            }
+        }
     }
 }
