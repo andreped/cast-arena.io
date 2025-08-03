@@ -50,6 +50,12 @@ export class Player {
         };
     }
 
+    getAimingData() {
+        return {
+            aimingAngle: this.aimingAngle
+        };
+    }
+
     isInViewport(cameraX, cameraY) {
         return this.x >= cameraX - GAME_CONFIG.world.viewportPadding &&
                this.x <= cameraX + GAME_CONFIG.canvas.width + GAME_CONFIG.world.viewportPadding &&

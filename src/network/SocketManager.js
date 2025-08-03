@@ -14,6 +14,7 @@ class SocketManager {
             this.handlePlayerConnection(socket);
 
             socket.on('playerMovement', (data) => this.handlePlayerMovement(socket, data));
+            socket.on('playerAiming', (data) => this.handlePlayerAiming(socket, data));
             socket.on('castSpell', (data) => this.handleSpellCast(socket, data));
             socket.on('spellHit', (data) => this.handleSpellHit(socket, data));
             socket.on('disconnect', () => this.handleDisconnection(socket));
@@ -69,6 +70,25 @@ class SocketManager {
                 isAlive: player.isAlive
             });
         }
+    }
+
+    handlePlayerAiming(socket, aimingData) {
+        const player = this.gameState.getPlayer(socket.id);
+        
+        if (!player || !player.isAlive) {
+            return;
+        }
+
+        // Update only the aiming angle, not position
+        if (aimingData.aimingAngle !== undefined) {
+            player.aimingAngle = aimingData.aimingAngle;
+        }
+
+        // Broadcast only the aiming update to other players
+        socket.broadcast.emit('playerAimed', {
+            id: socket.id,
+            aimingAngle: player.aimingAngle
+        });
     }
 
     handleSpellCast(socket, spellData) {

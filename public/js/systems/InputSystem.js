@@ -112,7 +112,8 @@ export class InputSystem {
             // Only send network update if angle changed significantly (avoid spam)
             const angleDiff = Math.abs(player.aimingAngle - previousAngle);
             if (angleDiff > 0.1 || angleDiff > Math.PI * 1.9) { // Handle angle wrap-around
-                this.game.network.sendMovement(player.getMovementData());
+                // Send only aiming data, not position data to avoid position desync
+                this.game.network.sendAimingUpdate(player.getAimingData());
             }
         }
     }

@@ -19,6 +19,7 @@ export class NetworkSystem {
         this.socket.on('wallData', this.handleWallData.bind(this));
         this.socket.on('newPlayer', this.handleNewPlayer.bind(this));
         this.socket.on('playerMoved', this.handlePlayerMoved.bind(this));
+        this.socket.on('playerAimed', this.handlePlayerAimed.bind(this));
         this.socket.on('playerPositionUpdate', this.handlePlayerPositionUpdate.bind(this));
         this.socket.on('forceSyncPlayer', this.handleForceSyncPlayer.bind(this));
         this.socket.on('playerDisconnected', this.handlePlayerDisconnected.bind(this));
@@ -82,6 +83,15 @@ export class NetworkSystem {
             }
             if (data.isAlive !== undefined) {
                 player.isAlive = data.isAlive;
+            }
+        }
+    }
+
+    handlePlayerAimed(data) {
+        const player = this.game.players.get(data.id);
+        if (player && data.id !== this.game.myId) {
+            if (data.aimingAngle !== undefined) {
+                player.aimingAngle = data.aimingAngle;
             }
         }
     }
@@ -201,6 +211,10 @@ export class NetworkSystem {
 
     sendMovement(movementData) {
         this.socket.emit('playerMovement', movementData);
+    }
+
+    sendAimingUpdate(aimingData) {
+        this.socket.emit('playerAiming', aimingData);
     }
 
     castSpell(spellData) {
