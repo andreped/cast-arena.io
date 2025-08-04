@@ -8,11 +8,18 @@ A real-time multiplayer wizard battle arena game where players can join, move ar
 
 *Note: The server may take 30-60 seconds to wake up if it's been inactive.*
 
+<img src="docs/assets/gameplay-snapshot.png" alt="Cast Arena Gameplay" width="600">
+
+*Live multiplayer wizard battles with spells, items, and real-time combat!*
+
 ## 🎯 How to Play
 
 - **Move:** Use WASD or Arrow keys to move your wizard around the arena
+- **Cast Spells:** Click or press Space to cast fireballs at your cursor location
+- **Mobile Support:** Touch controls available for mobile devices
+- **Collect Items:** Pick up speed boosts and mana potions scattered around the arena
+- **Battle:** Defeat other players to climb the leaderboard!
 - **Multiplayer:** Share the link with friends - everyone can play together in real-time!
-- **More features coming soon:** Spell casting, battles, and power-ups!
 
 ## 🛠️ Technology Stack
 
@@ -25,17 +32,20 @@ A real-time multiplayer wizard battle arena game where players can join, move ar
 ## 🚀 Features
 
 - ✅ Real-time multiplayer movement
+- ✅ Spell casting system with fireballs
+- ✅ Health and mana systems
+- ✅ Combat with burn effects
+- ✅ Item pickups (speed boosts & mana potions)
+- ✅ Player stats UI with health/mana bars
+- ✅ Active effects display
+- ✅ Leaderboard with kill tracking
+- ✅ Death and respawn mechanics
 - ✅ Beautiful wizard pixel art
-- ✅ Responsive game canvas
-- ✅ Live player counter
-- ✅ Cross-platform (works on desktop and mobile)
-- 🔄 Spell casting system (coming soon)
-- 🔄 Health and combat (coming soon)
-- 🔄 Power-ups and abilities (coming soon)
-
-## 🎨 Game Screenshot
-
-Join multiple players and watch them move around the magical arena in real-time!
+- ✅ Responsive game canvas with minimap
+- ✅ Performance monitoring (FPS/TPS display)
+- ✅ Cross-platform (desktop and mobile controls)
+- 🔄 More spells and abilities (coming soon)
+- 🔄 Team modes (coming soon)
 
 ## 🔧 Local Development
 
