@@ -712,7 +712,7 @@ export class RenderSystem {
         
         // Get directional wizard and cape sprites
         const wizardSprite = this.spriteSystem.getWizardSpriteForDirection(direction, player.color, pose);
-        const capeSprite = this.spriteSystem.getCapeSprite(direction);
+        const capeSprite = this.spriteSystem.getCapeSprite(direction, player.color);
         
         if (!wizardSprite) return;
         

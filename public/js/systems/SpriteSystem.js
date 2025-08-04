@@ -146,7 +146,7 @@ export class SpriteSystem {
         const ctx = canvas.getContext('2d');
         
         ctx.imageSmoothingEnabled = false;
-        this.drawCapePixelArt(ctx, 18, 22, 'side');
+        this.drawCapePixelArt(ctx, 18, 22, 'side', null); // null = use default colors
         
         this.sprites.set('cape_side', canvas);
     }
@@ -159,7 +159,7 @@ export class SpriteSystem {
         const ctx = canvas.getContext('2d');
         
         ctx.imageSmoothingEnabled = false;
-        this.drawCapePixelArt(ctx, 18, 22, 'front');
+        this.drawCapePixelArt(ctx, 18, 22, 'front', null); // null = use default colors
         
         this.sprites.set('cape_front', canvas);
     }
@@ -172,7 +172,7 @@ export class SpriteSystem {
         const ctx = canvas.getContext('2d');
         
         ctx.imageSmoothingEnabled = false;
-        this.drawCapePixelArt(ctx, 18, 22, 'back');
+        this.drawCapePixelArt(ctx, 18, 22, 'back', null); // null = use default colors
         
         this.sprites.set('cape_back', canvas);
     }
@@ -496,17 +496,49 @@ export class SpriteSystem {
         pixel(0, orbY, '#E6E6FA');
     }
 
-    drawCapePixelArt(ctx, centerX, centerY, direction = 'back') {
+    drawCapePixelArt(ctx, centerX, centerY, direction = 'back', playerColor = null) {
         const pixel = (x, y, color, size = 1) => {
             ctx.fillStyle = color;
             ctx.fillRect(centerX + x, centerY + y, size, size);
         };
 
-        // Cape colors - rich red with darker shadow
-        const capeColor = '#CC0000';      // Main cape color (red)
-        const capeShadow = '#800000';     // Darker red for shadows
-        const capeHighlight = '#FF3333'; // Lighter red for highlights
-        const clasp = '#FFD700';          // Gold clasp
+        // Generate cape color based on player color if provided
+        let capeColor, capeShadow, capeHighlight;
+        
+        if (playerColor) {
+            // Convert player color to cape color variations
+            const hex = playerColor.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Create cape color variations based on player color
+            // Shift the hue and adjust saturation for cape
+            const capeR = Math.min(255, Math.max(0, Math.floor(r * 0.8 + 40)));
+            const capeG = Math.min(255, Math.max(0, Math.floor(g * 0.6 + 20)));
+            const capeB = Math.min(255, Math.max(0, Math.floor(b * 1.2)));
+            
+            // Create shadow (darker version)
+            const shadowR = Math.floor(capeR * 0.6);
+            const shadowG = Math.floor(capeG * 0.6);
+            const shadowB = Math.floor(capeB * 0.6);
+            
+            // Create highlight (lighter version)
+            const highlightR = Math.min(255, Math.floor(capeR * 1.3));
+            const highlightG = Math.min(255, Math.floor(capeG * 1.3));
+            const highlightB = Math.min(255, Math.floor(capeB * 1.3));
+            
+            capeColor = `rgb(${capeR}, ${capeG}, ${capeB})`;
+            capeShadow = `rgb(${shadowR}, ${shadowG}, ${shadowB})`;
+            capeHighlight = `rgb(${highlightR}, ${highlightG}, ${highlightB})`;
+        } else {
+            // Default red cape colors if no player color provided
+            capeColor = '#CC0000';      // Main cape color (red)
+            capeShadow = '#800000';     // Darker red for shadows
+            capeHighlight = '#FF3333'; // Lighter red for highlights
+        }
+        
+        const clasp = '#FFD700';          // Gold clasp (always gold)
 
         if (direction === 'back') {
             // Full cape visible from behind - starting from shoulders only
@@ -622,6 +654,30 @@ export class SpriteSystem {
             pixel(-6, -5, capeHighlight);
             pixel(5, -5, capeHighlight);
         }
+    }
+
+    // Create colored version of cape sprite
+    createColoredCapeSprite(direction, playerColor) {
+        const spriteKey = `cape_${direction}_${playerColor}`;
+        
+        if (this.sprites.has(spriteKey)) {
+            return this.sprites.get(spriteKey);
+        }
+
+        // Create new canvas for colored cape
+        const canvas = document.createElement('canvas');
+        canvas.width = 36;
+        canvas.height = 44;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        
+        // Draw cape with player-specific colors
+        this.drawCapePixelArt(ctx, 18, 22, direction, playerColor);
+        
+        // Cache the colored cape sprite
+        this.sprites.set(spriteKey, canvas);
+        return canvas;
     }
 
     // Create colored version of wizard sprite
@@ -790,7 +846,37 @@ export class SpriteSystem {
     }
 
     // Get appropriate cape sprite based on direction
-    getCapeSprite(direction) {
+    getCapeSprite(direction, playerColor = null) {
+        if (playerColor) {
+            // Create colored cape based on player color
+            let actualDirection = direction;
+            
+            // Handle left-facing (flipped) capes
+            if (direction === 'left') {
+                const flippedKey = `cape_side_left_${playerColor}`;
+                if (!this.sprites.has(flippedKey)) {
+                    // Create flipped version of the colored side cape
+                    const originalSprite = this.createColoredCapeSprite('side', playerColor);
+                    const flippedCanvas = document.createElement('canvas');
+                    flippedCanvas.width = originalSprite.width;
+                    flippedCanvas.height = originalSprite.height;
+                    const ctx = flippedCanvas.getContext('2d');
+                    
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(originalSprite, -originalSprite.width, 0);
+                    
+                    this.sprites.set(flippedKey, flippedCanvas);
+                }
+                return this.sprites.get(flippedKey);
+            } else if (direction === 'right') {
+                actualDirection = 'side';
+            }
+            
+            return this.createColoredCapeSprite(actualDirection, playerColor);
+        }
+        
+        // Fallback to default colored capes
         switch (direction) {
             case 'left':
                 return this.sprites.get('cape_side_left');
