@@ -14,13 +14,16 @@ export class SpriteSystem {
         this.createStaffSprite();
         this.createVerticalStaffSprite();
         
+        // Create cape sprites for all directions
+        this.createCapeSprites();
+        
         // Create left-facing versions (flip right-facing sprites)
         this.createFlippedSprites();
     }
 
     createFlippedSprites() {
         // Create horizontally flipped versions for left-facing
-        const spritesToFlip = ['wizard_idle', 'wizard_cast', 'staff'];
+        const spritesToFlip = ['wizard_idle', 'wizard_cast', 'staff', 'cape_side'];
         
         spritesToFlip.forEach(spriteName => {
             const originalSprite = this.sprites.get(spriteName);
@@ -126,6 +129,52 @@ export class SpriteSystem {
         this.drawVerticalStaffPixelArt(ctx, 6, 20, frameIndex); // Centered in narrower canvas
         
         this.sprites.set(`staff_vertical_${frameName}`, canvas);
+    }
+
+    createCapeSprites() {
+        // Create cape sprites for different viewing angles
+        this.createCapeSideSprite();
+        this.createCapeFrontSprite();
+        this.createCapeBackSprite();
+    }
+
+    createCapeSideSprite() {
+        // Cape viewed from the side (for left/right facing)
+        const canvas = document.createElement('canvas');
+        canvas.width = 36;
+        canvas.height = 44;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawCapePixelArt(ctx, 18, 22, 'side');
+        
+        this.sprites.set('cape_side', canvas);
+    }
+
+    createCapeFrontSprite() {
+        // Cape viewed from front (partially visible over shoulders)
+        const canvas = document.createElement('canvas');
+        canvas.width = 36;
+        canvas.height = 44;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawCapePixelArt(ctx, 18, 22, 'front');
+        
+        this.sprites.set('cape_front', canvas);
+    }
+
+    createCapeBackSprite() {
+        // Cape viewed from behind (full cape visible)
+        const canvas = document.createElement('canvas');
+        canvas.width = 36;
+        canvas.height = 44;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawCapePixelArt(ctx, 18, 22, 'back');
+        
+        this.sprites.set('cape_back', canvas);
     }
 
     drawWizardPixelArt(ctx, centerX, centerY, pose = 'idle') {
@@ -447,6 +496,134 @@ export class SpriteSystem {
         pixel(0, orbY, '#E6E6FA');
     }
 
+    drawCapePixelArt(ctx, centerX, centerY, direction = 'back') {
+        const pixel = (x, y, color, size = 1) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(centerX + x, centerY + y, size, size);
+        };
+
+        // Cape colors - rich red with darker shadow
+        const capeColor = '#CC0000';      // Main cape color (red)
+        const capeShadow = '#800000';     // Darker red for shadows
+        const capeHighlight = '#FF3333'; // Lighter red for highlights
+        const clasp = '#FFD700';          // Gold clasp
+
+        if (direction === 'back') {
+            // Full cape visible from behind - starting from shoulders only
+            
+            // Cape shoulders attachment - at shoulder level
+            pixel(-3, -8, clasp);
+            pixel(-2, -8, clasp);
+            pixel(-1, -8, clasp);
+            pixel(0, -8, clasp);
+            pixel(1, -8, clasp);
+            pixel(2, -8, clasp);
+            
+            // Cape main body - flowing outward from shoulders
+            // Upper section - starting from shoulder level
+            pixel(-5, -6, capeColor, 2);
+            pixel(-3, -6, capeColor, 2);
+            pixel(-1, -6, capeColor, 2);
+            pixel(1, -6, capeColor, 2);
+            pixel(3, -6, capeColor, 2);
+            
+            // Middle section
+            pixel(-6, -4, capeColor, 2);
+            pixel(-4, -4, capeColor, 2);
+            pixel(-2, -4, capeColor, 2);
+            pixel(0, -4, capeColor, 2);
+            pixel(2, -4, capeColor, 2);
+            pixel(4, -4, capeColor, 2);
+            
+            // Lower sections - flowing downward
+            for (let row = 0; row < 8; row++) {
+                const y = -2 + row * 2;
+                const width = Math.max(2, 5 - Math.floor(row * 0.3)); // Start narrower, taper gradually
+                
+                for (let col = -width; col <= width; col += 2) {
+                    pixel(col, y, capeColor, 2);
+                }
+            }
+            
+            // Add shadows on the right side for depth
+            for (let row = 0; row < 6; row++) {
+                const y = -2 + row * 2;
+                const shadowX = 3 - Math.floor(row * 0.2);
+                if (shadowX >= -4) { // Don't go too far left
+                    pixel(shadowX, y, capeShadow, 2);
+                }
+            }
+            
+            // Add highlights on the left side
+            for (let row = 0; row < 4; row++) {
+                const y = 0 + row * 2;
+                const highlightX = -4 + Math.floor(row * 0.1);
+                pixel(highlightX, y, capeHighlight);
+            }
+            
+        } else if (direction === 'side') {
+            // Cape from side view - flowing behind the character from shoulders
+            
+            // Cape attachment at shoulder
+            pixel(-2, -8, clasp);
+            pixel(-1, -8, clasp);
+            pixel(0, -8, clasp);
+            
+            // Cape flowing behind (starting from shoulders)
+            // Upper flowing section
+            pixel(-6, -6, capeColor, 2);
+            pixel(-4, -6, capeColor, 2);
+            pixel(-2, -6, capeColor, 2);
+            
+            pixel(-8, -4, capeColor, 2);
+            pixel(-6, -4, capeColor, 2);
+            pixel(-4, -4, capeColor, 2);
+            
+            // Flowing downward from shoulders
+            for (let row = 0; row < 8; row++) {
+                const y = -2 + row * 2;
+                const width = 4 - Math.floor(row * 0.2);
+                
+                for (let col = -width - 4; col <= -2; col += 2) {
+                    pixel(col, y, capeColor, 2);
+                }
+            }
+            
+            // Add shadows
+            for (let row = 0; row < 6; row++) {
+                const y = -2 + row * 2;
+                pixel(-4, y, capeShadow, 2);
+                pixel(-6, y, capeShadow);
+            }
+            
+        } else if (direction === 'front') {
+            // Cape from front - very subtle shoulder hints only, no visible flowing cape
+            
+            // Very subtle left shoulder cape hint
+            pixel(-7, -6, capeColor);
+            pixel(-6, -6, capeColor);
+            pixel(-7, -4, capeColor);
+            pixel(-6, -4, capeColor);
+            pixel(-7, -2, capeColor);
+            
+            // Very subtle right shoulder cape hint
+            pixel(5, -6, capeColor);
+            pixel(6, -6, capeColor);
+            pixel(5, -4, capeColor);
+            pixel(6, -4, capeColor);
+            pixel(6, -2, capeColor);
+            
+            // Small collar clasp visible at neck line
+            pixel(-1, -9, clasp);
+            pixel(0, -9, clasp);
+            pixel(1, -9, clasp);
+            
+            // Tiny highlights on shoulder edges
+            pixel(-6, -5, capeHighlight);
+            pixel(5, -5, capeHighlight);
+        }
+    }
+
     // Create colored version of wizard sprite
     createColoredWizardSprite(color, pose = 'idle', facingLeft = false) {
         const facingSuffix = facingLeft ? '_left' : '';
@@ -609,6 +786,22 @@ export class SpriteSystem {
                 return this.sprites.get('staff_vertical_idle'); // Idle frame
             default:
                 return this.sprites.get('staff');
+        }
+    }
+
+    // Get appropriate cape sprite based on direction
+    getCapeSprite(direction) {
+        switch (direction) {
+            case 'left':
+                return this.sprites.get('cape_side_left');
+            case 'right':
+                return this.sprites.get('cape_side');
+            case 'back':
+                return this.sprites.get('cape_back');
+            case 'front':
+                return this.sprites.get('cape_front');
+            default:
+                return this.sprites.get('cape_side');
         }
     }
 

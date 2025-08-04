@@ -710,8 +710,9 @@ export class RenderSystem {
             direction = player.facingLeft ? 'left' : 'right';
         }
         
-        // Get directional wizard sprite (body doesn't change with every angle)
+        // Get directional wizard and cape sprites
         const wizardSprite = this.spriteSystem.getWizardSpriteForDirection(direction, player.color, pose);
+        const capeSprite = this.spriteSystem.getCapeSprite(direction);
         
         if (!wizardSprite) return;
         
@@ -721,6 +722,23 @@ export class RenderSystem {
         // Move to player position
         this.ctx.translate(player.x, player.y);
         
+        // Draw cape behind wizard for front/side views (cape should appear behind player)
+        if (capeSprite && direction !== 'back') {
+            // Cape appears behind the wizard for front and side views
+            this.ctx.save();
+            this.ctx.translate(0, 2); // Slightly lower to appear behind
+            
+            this.ctx.drawImage(
+                capeSprite,
+                -(capeSprite.width * scale) / 2,
+                -(capeSprite.height * scale) / 2,
+                capeSprite.width * scale,
+                capeSprite.height * scale
+            );
+            
+            this.ctx.restore();
+        }
+        
         // Draw wizard sprite centered at origin
         this.ctx.drawImage(
             wizardSprite,
@@ -729,6 +747,17 @@ export class RenderSystem {
             wizardSprite.width * scale,
             wizardSprite.height * scale
         );
+        
+        // Draw cape in front when facing away (we see the back of the cape)
+        if (capeSprite && direction === 'back') {
+            this.ctx.drawImage(
+                capeSprite,
+                -(capeSprite.width * scale) / 2,
+                -(capeSprite.height * scale) / 2,
+                capeSprite.width * scale,
+                capeSprite.height * scale
+            );
+        }
         
         // Draw staff with 360-degree rotation following mouse
         this.drawStaffWithAngle(aimingAngle, castAnimationRotation, scale);
