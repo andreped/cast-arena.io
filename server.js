@@ -41,10 +41,16 @@ const gameLoop = () => {
             gameState.itemSystem.resetChangeFlag();
         }
         
-        // Only send player state updates if there are speed buffs active
+        // Send player state updates for all players periodically, and immediately for players with buffs
         const playersWithBuffs = gameState.getPlayersWithActiveBuffs();
         if (Object.keys(playersWithBuffs).length > 0) {
             io.emit('gameStateUpdate', playersWithBuffs);
+        }
+        
+        // Send complete state for all players every 4 seconds to ensure synchronization
+        if (gameLoopCounter % 80 === 0) { // Every 80 ticks = 4 seconds at 20 TPS
+            const allPlayersState = gameState.getCurrentState();
+            io.emit('gameStateUpdate', allPlayersState);
         }
     }
     
