@@ -20,6 +20,9 @@ export class Player {
         this.isRespawning = data.isRespawning || false;
         this.currentSpeedMultiplier = data.currentSpeedMultiplier || 1.0;
         this.speedBuffs = data.speedBuffs || [];
+        
+        // Track recent mana pickups for UI display
+        this.recentManaPickups = data.recentManaPickups || [];
     }
 
     update(data) {
@@ -63,5 +66,32 @@ export class Player {
                this.x <= cameraX + GAME_CONFIG.canvas.width + GAME_CONFIG.world.viewportPadding &&
                this.y >= cameraY - GAME_CONFIG.world.viewportPadding &&
                this.y <= cameraY + GAME_CONFIG.canvas.height + GAME_CONFIG.world.viewportPadding;
+    }
+    
+    // Add a recent mana pickup for UI display
+    addRecentManaPickup(amount) {
+        const pickup = {
+            amount: amount,
+            timestamp: Date.now(),
+            duration: 3000 // Show for 3 seconds
+        };
+        this.recentManaPickups.push(pickup);
+        
+        // Clean up old pickups
+        this.cleanupExpiredManaPickups();
+    }
+    
+    // Clean up expired mana pickups
+    cleanupExpiredManaPickups() {
+        const now = Date.now();
+        this.recentManaPickups = this.recentManaPickups.filter(
+            pickup => now - pickup.timestamp < pickup.duration
+        );
+    }
+    
+    // Get total recent mana picked up (for display)
+    getTotalRecentMana() {
+        this.cleanupExpiredManaPickups();
+        return this.recentManaPickups.reduce((total, pickup) => total + pickup.amount, 0);
     }
 }

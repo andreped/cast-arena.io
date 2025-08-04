@@ -161,8 +161,18 @@ export class NetworkSystem {
     handleManaUpdate(data) {
         const player = this.game.players.get(data.id);
         if (player) {
+            const oldMana = player.mana;
             player.mana = data.mana;
             player.maxMana = data.maxMana;
+            
+            // If this is our player and mana increased significantly, it's likely from a pickup
+            if (data.id === this.game.myId && data.mana > oldMana) {
+                const manaGained = data.mana - oldMana;
+                // Only track significant mana gains (5+ mana) to avoid showing regen
+                if (manaGained >= 5) {
+                    player.addRecentManaPickup(manaGained);
+                }
+            }
         }
     }
 
