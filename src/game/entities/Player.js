@@ -92,6 +92,18 @@ class Player {
         return false;
     }
 
+    restoreMana(amount) {
+        const oldMana = this.mana;
+        this.mana = Math.min(this.maxMana, this.mana + amount);
+        
+        // Mark mana as changed if it changed significantly (at least 2 points)
+        if (Math.abs(this.mana - this.lastBroadcastMana) >= 2) {
+            this.manaChanged = true;
+        }
+        
+        return this.mana - oldMana; // Return actual amount restored
+    }
+
     updateMana() {
         const oldMana = this.mana;
         

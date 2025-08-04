@@ -1,4 +1,5 @@
 const SpeedItem = require('../entities/SpeedItem');
+const ManaItem = require('../entities/ManaItem');
 const gameConfig = require('../../config/gameConfig');
 
 class ItemSystem {
@@ -11,9 +12,15 @@ class ItemSystem {
         // Item type configurations - easily extendable for future items
         this.itemConfigs = {
             speed: {
-                maxItems: 0, // Disabled to test jittering issue
+                maxItems: 8,
                 spawnInterval: 5000, // 5 seconds for testing (was 15000)
                 entityClass: SpeedItem,
+                lastSpawnTime: 0
+            },
+            mana: {
+                maxItems: 4, // Rarer than speed items
+                spawnInterval: 5000, // Same spawn frequency as speed items
+                entityClass: ManaItem,
                 lastSpawnTime: 0
             }
             // Future items can be added here:
@@ -135,9 +142,15 @@ class ItemSystem {
         if (!item || !player) return;
 
         // Apply item effect based on type
+        let effectValue;
         if (item.type === 'speed') {
             player.addSpeedBuff(item.speedBoost, item.duration);
+            effectValue = item.speedBoost;
             console.log(`Player ${playerId} picked up speed item (+${item.speedBoost * 100}% speed for ${item.duration/1000}s)`);
+        } else if (item.type === 'mana') {
+            const manaRestored = player.restoreMana(item.manaRestore);
+            effectValue = manaRestored;
+            console.log(`Player ${playerId} picked up mana item (+${manaRestored} mana)`);
         }
 
         // Remove item from world
@@ -148,7 +161,7 @@ class ItemSystem {
             playerId,
             itemId,
             itemType: item.type,
-            effect: item.speedBoost
+            effect: effectValue
         };
     }
 
