@@ -466,6 +466,23 @@ export class InputSystem {
         const latency = performance.now() - pendingInput.timestamp;
         this.debugStats.avgLatency = (this.debugStats.avgLatency + latency) / 2;
 
+        // For speed-boosted players, add reconciliation throttling to reduce jitter
+        const playerSpeedMultiplier = player.currentSpeedMultiplier || 1.0;
+        const now = performance.now();
+        
+        // Throttle reconciliation frequency for fast players
+        if (playerSpeedMultiplier > 1.2) {
+            const minReconciliationInterval = 100 * playerSpeedMultiplier; // ms between reconciliations
+            if (!this.lastReconciliationTime) this.lastReconciliationTime = 0;
+            
+            if (now - this.lastReconciliationTime < minReconciliationInterval) {
+                // Skip this reconciliation to reduce jitter
+                this.pendingInputs.delete(serverData.sequence);
+                return;
+            }
+            this.lastReconciliationTime = now;
+        }
+
         // Calculate difference between client prediction and server position
         const deltaX = serverData.x - player.x;
         const deltaY = serverData.y - player.y;
@@ -481,19 +498,51 @@ export class InputSystem {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
         }
 
-        // Use a much smaller threshold for frame-rate independent movement
-        const reconciliationThreshold = 0.5; // Much smaller threshold for precise movement
+        // Dynamic threshold based on player speed to handle speed boosts better
+        const baseThreshold = 2.0; // Increased from 0.5 to be less strict for normal movement
+        const speedMultiplier = playerSpeedMultiplier; // Use the same variable
+        
+        // For speed-boosted players, be much more lenient with position differences
+        let reconciliationThreshold;
+        if (speedMultiplier > 1.2) {
+            // Much higher threshold for speed-boosted players to prevent constant corrections
+            reconciliationThreshold = baseThreshold * speedMultiplier * 3.0; // 3x more lenient
+        } else {
+            // More reasonable threshold for normal players
+            reconciliationThreshold = baseThreshold * Math.max(1.0, speedMultiplier);
+        }
         
         if (totalDelta > reconciliationThreshold) {
-            // Apply immediate but gentle correction for frame-rate independent movement
-            const correctionFactor = 0.3; // 30% immediate correction
+            // For speed-boosted players, use much gentler corrections
+            let correctionFactor;
+            if (speedMultiplier > 1.2) {
+                // Very gentle corrections for speed-boosted players
+                correctionFactor = 0.05 / speedMultiplier; // Even smaller corrections to reduce pushback
+                
+                // Further reduce correction if player is actively moving (to prevent pushback during movement)
+                const isMoving = this.keys.w || this.keys.a || this.keys.s || this.keys.d || 
+                               this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight ||
+                               (this.isMobile && this.joystickActive);
+                
+                if (isMoving) {
+                    correctionFactor *= 0.3; // Reduce correction by 70% when actively moving
+                }
+            } else {
+                // Reasonable correction factor for normal players
+                const baseCorrectionFactor = 0.15; // Reduced from 0.3 to be gentler
+                correctionFactor = baseCorrectionFactor / Math.max(1.0, speedMultiplier * 0.8);
+            }
+            
             player.x += deltaX * correctionFactor;
             player.y += deltaY * correctionFactor;
             
             this.debugStats.reconciliations++;
             
             if (this.debugMode) {
-                this.addDebugLog(`🔧 GENTLE CORRECT: applied ${(correctionFactor * 100)}% of ${totalDelta.toFixed(1)}px delta`);
+                const isMoving = this.keys.w || this.keys.a || this.keys.s || this.keys.d || 
+                               this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight ||
+                               (this.isMobile && this.joystickActive);
+                this.addDebugLog(`🔧 SPEED-AWARE CORRECT: threshold=${reconciliationThreshold.toFixed(1)}px, factor=${(correctionFactor * 100).toFixed(1)}%, speed=${speedMultiplier.toFixed(1)}x, moving=${isMoving}`);
             }
         }
 
@@ -507,8 +556,14 @@ export class InputSystem {
 
     // Apply smooth position correction based on accumulated debt
     applySmoothCorrection(player, customRate = null) {
-        const rate = customRate || this.smoothingRate;
-        const maxCorrection = this.frameDebtReduction;
+        // Adjust smoothing parameters based on player speed
+        const speedMultiplier = player.currentSpeedMultiplier || 1.0;
+        const baseRate = customRate || this.smoothingRate;
+        const baseMaxCorrection = this.frameDebtReduction;
+        
+        // Increase smoothing rate and max correction for faster players to reduce jitter
+        const rate = baseRate * Math.min(2.0, 1.0 + (speedMultiplier - 1.0) * 0.5);
+        const maxCorrection = baseMaxCorrection * Math.min(1.5, speedMultiplier);
         
         // Calculate how much debt to pay off this frame
         const debtMagnitude = Math.sqrt(this.positionDebt.x * this.positionDebt.x + this.positionDebt.y * this.positionDebt.y);
@@ -530,7 +585,7 @@ export class InputSystem {
             this.positionDebt.y -= correctionY;
             
             if (this.debugMode && Math.abs(correctionX) > 0.1 || Math.abs(correctionY) > 0.1) {
-                this.addDebugLog(`🔧 SMOOTH: corrected (${correctionX.toFixed(1)}, ${correctionY.toFixed(1)}), remaining debt: ${(debtMagnitude - correctionMagnitude).toFixed(1)}px`);
+                this.addDebugLog(`🔧 SPEED-AWARE SMOOTH: corrected (${correctionX.toFixed(1)}, ${correctionY.toFixed(1)}), rate=${rate.toFixed(2)}, maxCorr=${maxCorrection.toFixed(1)}, speed=${speedMultiplier.toFixed(1)}x`);
             }
         }
     }

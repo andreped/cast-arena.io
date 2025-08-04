@@ -21,6 +21,11 @@ export class Player {
         this.currentSpeedMultiplier = data.currentSpeedMultiplier || 1.0;
         this.speedBuffs = data.speedBuffs || [];
         
+        // Ensure currentSpeedMultiplier is always a valid number
+        if (typeof this.currentSpeedMultiplier !== 'number' || isNaN(this.currentSpeedMultiplier)) {
+            this.currentSpeedMultiplier = 1.0;
+        }
+        
         // Track recent mana pickups for UI display
         this.recentManaPickups = data.recentManaPickups || [];
     }

@@ -156,9 +156,9 @@ class Player {
         for (const buff of this.speedBuffs) {
             this.currentSpeedMultiplier += buff.multiplier;
         }
-        
-        // Cap the maximum speed boost (optional - prevent crazy speeds)
-        this.currentSpeedMultiplier = Math.min(this.currentSpeedMultiplier, 3.0); // Max 3x speed
+
+        // Cap the maximum speed boost at 250%
+        this.currentSpeedMultiplier = Math.min(this.currentSpeedMultiplier, 2.5); // Max 2.5x speed (250%)
     }
 
     getEffectiveSpeed() {
