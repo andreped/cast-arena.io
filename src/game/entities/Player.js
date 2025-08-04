@@ -22,6 +22,8 @@ class Player {
         this.spawnProtection = false;
         this.speedBuffs = []; // Array to track multiple speed buffs
         this.currentSpeedMultiplier = 1.0;
+        this.lastBroadcastMana = gameConfig.player.maxMana; // Track last broadcasted mana value
+        this.manaChanged = false; // Flag for optimization
     }
 
     getRandomColor() {
@@ -77,13 +79,22 @@ class Player {
 
     consumeMana(amount) {
         if (this.mana >= amount) {
+            const oldMana = this.mana;
             this.mana -= amount;
+            
+            // Mark mana as changed if it changed significantly (at least 2 points)
+            if (Math.abs(this.mana - this.lastBroadcastMana) >= 2) {
+                this.manaChanged = true;
+            }
+            
             return true;
         }
         return false;
     }
 
     updateMana() {
+        const oldMana = this.mana;
+        
         if (this.mana < this.maxMana) {
             const now = Date.now();
             const timeDiff = (now - this.lastManaRegenTime) / 1000; // Convert to seconds
@@ -93,6 +104,11 @@ class Player {
                 this.mana = Math.min(this.maxMana, this.mana + Math.floor(manaToRestore));
                 this.lastManaRegenTime = now;
             }
+        }
+        
+        // Mark mana as changed if it changed significantly (at least 2 points)
+        if (Math.abs(this.mana - this.lastBroadcastMana) >= 2) {
+            this.manaChanged = true;
         }
     }
 
@@ -135,6 +151,16 @@ class Player {
 
     getEffectiveSpeed() {
         return gameConfig.player.speed * this.currentSpeedMultiplier;
+    }
+
+    // Mana change tracking methods for optimization
+    hasManaChanged() {
+        return this.manaChanged;
+    }
+
+    resetManaChangeFlag() {
+        this.manaChanged = false;
+        this.lastBroadcastMana = this.mana;
     }
 
     toJSON() {

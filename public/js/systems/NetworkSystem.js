@@ -39,7 +39,7 @@ export class NetworkSystem {
         
         // Throttling for movement updates
         this.lastMovementUpdate = 0;
-        this.movementUpdateInterval = 1000 / 120; // 30 updates per second max
+        this.movementUpdateInterval = 1000 / 30; // 30 updates per second max
     }
 
     // Add cleanup method
@@ -250,9 +250,18 @@ export class NetworkSystem {
         if (this.game.inputSystem && typeof this.game.inputSystem.updateServerTps === 'function') {
             this.game.inputSystem.updateServerTps(data.tps);
             // Update target TPS if provided
-            if (data.target) {
+            if (data.target !== undefined) {
                 this.game.inputSystem.targetTps = data.target;
             }
+        }
+        
+        // Direct DOM update to ensure TPS display works immediately
+        const serverTpsEl = document.getElementById('serverTps');
+        if (serverTpsEl && data.tps !== undefined && data.target !== undefined) {
+            const tpsColor = data.tps >= data.target * 0.9 ? '#00ff00' : 
+                           data.tps >= data.target * 0.7 ? '#ffaa00' : '#ff0000';
+            const tpsEfficiency = ((data.tps / data.target) * 100).toFixed(0);
+            serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${data.tps}/${data.target} TPS</span> <span style="color: #888; font-size: 10px;">(${tpsEfficiency}%)</span>`;
         }
     }
 }

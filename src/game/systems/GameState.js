@@ -106,6 +106,17 @@ class GameState {
     pickupItem(playerId, itemId) {
         return this.itemSystem.pickupItem(playerId, itemId);
     }
+
+    // Get only players with active speed buffs (optimization)
+    getPlayersWithActiveBuffs() {
+        const playersWithBuffs = {};
+        for (const [id, player] of this.players) {
+            if (player.currentSpeedMultiplier > 1.0) {
+                playersWithBuffs[id] = player.toJSON();
+            }
+        }
+        return playersWithBuffs;
+    }
 }
 
 module.exports = GameState;

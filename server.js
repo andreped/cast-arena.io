@@ -21,22 +21,37 @@ const burnSystem = new BurnSystem(gameState, io);
 const socketManager = new SocketManager(io, gameState, burnSystem);
 
 // Game loop for server-side updates
+let gameLoopCounter = 0;
 const gameLoop = () => {
     // Register this tick for TPS monitoring
     socketManager.registerTick();
     
     gameState.update();
     
-    // Always send item updates to all clients (even when empty to handle removals)
-    const itemsState = gameState.getItemsState();
-    io.emit('itemsUpdate', itemsState);
+    gameLoopCounter++;
     
-    // Send player updates to synchronize speed buffs and other dynamic data
-    const currentState = gameState.getCurrentState();
-    io.emit('gameStateUpdate', currentState);
+    // Reduce broadcast frequency to minimize network overhead
+    // Only broadcast every 4th tick (4 times per second instead of 20)
+    if (gameLoopCounter % 5 === 0) {
+        // Only send item updates if items have actually changed
+        const itemsState = gameState.getItemsState();
+        const itemsChanged = gameState.itemSystem.hasItemsChanged();
+        if (itemsChanged || gameLoopCounter % 20 === 0) { // Force update every second
+            io.emit('itemsUpdate', itemsState);
+            gameState.itemSystem.resetChangeFlag();
+        }
+        
+        // Only send player state updates if there are speed buffs active
+        const playersWithBuffs = gameState.getPlayersWithActiveBuffs();
+        if (Object.keys(playersWithBuffs).length > 0) {
+            io.emit('gameStateUpdate', playersWithBuffs);
+        }
+    }
     
-    // Send mana updates for all players (every few loops to reduce network traffic)
-    socketManager.broadcastManaUpdates();
+    // Send mana updates less frequently (every 10th tick = 2 times per second)
+    if (gameLoopCounter % 10 === 0) {
+        socketManager.broadcastManaUpdates();
+    }
 };
 
 // Configurable server tick rate (default 20 TPS = 50ms)

@@ -303,10 +303,11 @@ class SocketManager {
     }
 
     broadcastManaUpdates() {
-        // Send mana updates for all players
+        // Only send mana updates for players whose mana has changed significantly
         for (const [id, player] of this.gameState.players) {
-            if (player.isAlive) {
+            if (player.isAlive && player.hasManaChanged()) {
                 this.emitManaUpdate(player);
+                player.resetManaChangeFlag();
             }
         }
     }
@@ -316,16 +317,31 @@ class SocketManager {
         // Get target TPS from environment or default to 20
         this.targetTps = process.env.SERVER_TPS ? parseInt(process.env.SERVER_TPS) : 20;
         
+        // Initialize timing properly
+        this.lastTpsTime = Date.now();
+        this.tickCount = 0;
+        
         // Calculate TPS every second and broadcast to clients
         setInterval(() => {
             const now = Date.now();
-            this.currentTps = Math.round(this.tickCount * 1000 / (now - this.lastTpsTime));
+            const timeDiff = now - this.lastTpsTime;
+            
+            // Only calculate if we have meaningful time difference
+            if (timeDiff > 0) {
+                this.currentTps = Math.round(this.tickCount * 1000 / timeDiff);
+            } else {
+                this.currentTps = 0;
+            }
             
             // Broadcast TPS to all connected clients with target info
             this.io.emit('serverTps', { 
                 tps: this.currentTps,
                 target: this.targetTps
             });
+            
+            // Debug log for troubleshooting - both calculation and emission
+            console.log(`📊 Server TPS: ${this.currentTps}/${this.targetTps} (${this.tickCount} ticks in ${timeDiff}ms)`);
+            console.log(`📡 Broadcasting TPS to ${this.io.engine.clientsCount} clients: {tps: ${this.currentTps}, target: ${this.targetTps}}`);
             
             // Reset counters
             this.tickCount = 0;

@@ -6,11 +6,12 @@ class ItemSystem {
         this.gameState = gameState;
         this.items = new Map();
         this.seed = 54321; // Different seed from walls
+        this.itemsChanged = false; // Track if items have changed since last broadcast
         
         // Item type configurations - easily extendable for future items
         this.itemConfigs = {
             speed: {
-                maxItems: 8,
+                maxItems: 0, // Disabled to test jittering issue
                 spawnInterval: 5000, // 5 seconds for testing (was 15000)
                 entityClass: SpeedItem,
                 lastSpawnTime: 0
@@ -72,6 +73,7 @@ class ItemSystem {
             const item = new config.entityClass(itemId, position.x, position.y);
             
             this.items.set(itemId, item);
+            this.markItemsChanged(); // Mark for network update
             console.log(`Spawned ${itemType} item at (${position.x}, ${position.y})`);
             
             // Check if any player is already at this position for immediate pickup
@@ -140,6 +142,7 @@ class ItemSystem {
 
         // Remove item from world
         this.items.delete(itemId);
+        this.markItemsChanged(); // Mark for network update
 
         return {
             playerId,
@@ -151,6 +154,7 @@ class ItemSystem {
 
     removeItem(itemId) {
         this.items.delete(itemId);
+        this.markItemsChanged(); // Mark for network update
     }
 
     getItemsInArea(x, y, width, height) {
@@ -170,6 +174,19 @@ class ItemSystem {
             items[id] = item.toJSON();
         }
         return items;
+    }
+
+    // Optimization methods for change tracking
+    hasItemsChanged() {
+        return this.itemsChanged;
+    }
+
+    resetChangeFlag() {
+        this.itemsChanged = false;
+    }
+
+    markItemsChanged() {
+        this.itemsChanged = true;
     }
 }
 
