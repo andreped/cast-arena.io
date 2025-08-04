@@ -303,10 +303,11 @@ class SocketManager {
     }
 
     broadcastManaUpdates() {
-        // Send mana updates for all players
+        // Only send mana updates for players whose mana has changed significantly
         for (const [id, player] of this.gameState.players) {
-            if (player.isAlive) {
+            if (player.isAlive && player.hasManaChanged()) {
                 this.emitManaUpdate(player);
+                player.resetManaChangeFlag();
             }
         }
     }

@@ -9,7 +9,7 @@ export const GAME_CONFIG = {
         viewportPadding: 100
     },
     player: {
-        speed: 3,
+        speed: 180, // pixels per second (was 3 pixels per frame * 60 FPS)
         size: 20,
         maxHealth: 100,
         maxMana: 50

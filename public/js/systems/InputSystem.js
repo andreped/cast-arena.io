@@ -334,9 +334,6 @@ export class InputSystem {
         // Calculate FPS
         this.calculateFPS(deltaTime);
         
-        // Apply any pending smooth corrections even when not receiving new server data
-        this.applySmoothCorrection(this.game.players.get(this.game.myId));
-        
         if (!this.game.canPlay()) return;
         
         const player = this.game.players.get(this.game.myId);
@@ -346,9 +343,9 @@ export class InputSystem {
         let newX = player.x;
         let newY = player.y;
         
-        // Convert speed from pixels per frame to pixels per second
-        // Assuming target framerate of 60 FPS for the base speed
-        const effectiveSpeed = player.getEffectiveSpeed() * (deltaTime / 16.67); // 16.67ms = 60 FPS
+        // Frame-rate independent movement (speed is pixels per second)
+        // Convert deltaTime from milliseconds to seconds and apply to speed
+        const effectiveSpeed = player.getEffectiveSpeed() * (deltaTime / 1000);
 
         if (this.keys.w || this.keys.ArrowUp) {
             newY -= effectiveSpeed;
@@ -482,57 +479,24 @@ export class InputSystem {
             this.debugStats.largestDelta = totalDelta;
         }
 
-        // Add server state to buffer for interpolation
-        this.serverStateBuffer.push({
-            timestamp: performance.now(),
-            x: serverData.x,
-            y: serverData.y,
-            sequence: serverData.sequence
-        });
-        
-        // Keep buffer size manageable
-        if (this.serverStateBuffer.length > this.maxBufferSize) {
-            this.serverStateBuffer.shift();
-        }
-
         // Debug logging
         if (this.debugMode || window.location.hostname === 'localhost') {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
         }
 
-        // Check if player is actively moving
-        const isMoving = this.keys.w || this.keys.s || this.keys.a || this.keys.d || 
-                         this.keys.ArrowUp || this.keys.ArrowDown || this.keys.ArrowLeft || this.keys.ArrowRight ||
-                         (this.isMobile && this.joystickActive);
-
-        // Advanced smoothing approach based on gamedev.stackexchange suggestions
-        if (totalDelta > this.reconciliationThreshold) {
-            // Accumulate position debt instead of immediate correction
-            this.positionDebt.x += deltaX;
-            this.positionDebt.y += deltaY;
+        // Use a much smaller threshold for frame-rate independent movement
+        const reconciliationThreshold = 0.5; // Much smaller threshold for precise movement
+        
+        if (totalDelta > reconciliationThreshold) {
+            // Apply immediate but gentle correction for frame-rate independent movement
+            const correctionFactor = 0.3; // 30% immediate correction
+            player.x += deltaX * correctionFactor;
+            player.y += deltaY * correctionFactor;
             
-            const totalDebt = Math.sqrt(this.positionDebt.x * this.positionDebt.x + this.positionDebt.y * this.positionDebt.y);
+            this.debugStats.reconciliations++;
             
-            if (totalDebt > this.maxSnapThreshold) {
-                // Debt too large - snap to server position and reset debt
-                if (this.debugMode) {
-                    this.addDebugLog(`💥 SNAP - debt too large: ${totalDebt.toFixed(1)}px`);
-                }
-                player.x = serverData.x;
-                player.y = serverData.y;
-                this.positionDebt.x = 0;
-                this.positionDebt.y = 0;
-                this.debugStats.reconciliations++;
-            } else if (!isMoving) {
-                // Player not moving - apply smooth debt reduction
-                this.applySmoothCorrection(player);
-                this.debugStats.reconciliations++;
-            } else {
-                // Player is moving - reduce debt more gradually to avoid jitter
-                this.applySmoothCorrection(player, 0.05); // Even gentler correction while moving
-                if (this.debugMode) {
-                    this.addDebugLog(`🎮 SMOOTH while moving - debt: ${totalDebt.toFixed(1)}px`);
-                }
+            if (this.debugMode) {
+                this.addDebugLog(`🔧 GENTLE CORRECT: applied ${(correctionFactor * 100)}% of ${totalDelta.toFixed(1)}px delta`);
             }
         }
 
@@ -724,9 +688,9 @@ export class InputSystem {
     }
 
     getFrameTimeColor(frameTime) {
-        if (frameTime <= 16.67) return '#00ff00';  // Green - 60 FPS
-        if (frameTime <= 33.33) return '#ffaa00';  // Orange - 30 FPS
-        if (frameTime <= 50) return '#ff6600';     // Red-Orange - 20 FPS
+        if (frameTime <= 16.67) return '#00ff00';  // Green - 60+ FPS
+        if (frameTime <= 33.33) return '#ffaa00';  // Orange - 30-60 FPS
+        if (frameTime <= 50) return '#ff6600';     // Red-Orange - 20-30 FPS
         return '#ff0000';                          // Red - <20 FPS
     }
 
@@ -820,11 +784,11 @@ export class InputSystem {
         
         // Simulate game loop without rendering
         for (let i = 0; i < iterations; i++) {
-            // Simulate typical update operations
-            const deltaTime = 16.67; // 60 FPS
+            // Simulate typical update operations with frame-rate independent timing
+            const deltaTime = 16.67; // Average frame time for testing (60 FPS equivalent)
             // Mock player update
-            const mockPlayer = { x: 100, y: 100, getEffectiveSpeed: () => 5 };
-            const newX = mockPlayer.x + 1;
+            const mockPlayer = { x: 100, y: 100, getEffectiveSpeed: () => 180 }; // pixels per second
+            const newX = mockPlayer.x + (mockPlayer.getEffectiveSpeed() * deltaTime / 1000);
             const newY = mockPlayer.y + 1;
         }
         

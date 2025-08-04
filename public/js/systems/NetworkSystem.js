@@ -39,7 +39,7 @@ export class NetworkSystem {
         
         // Throttling for movement updates
         this.lastMovementUpdate = 0;
-        this.movementUpdateInterval = 1000 / 120; // 30 updates per second max
+        this.movementUpdateInterval = 1000 / 30; // 30 updates per second max
     }
 
     // Add cleanup method
