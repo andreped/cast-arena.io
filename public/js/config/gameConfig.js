@@ -16,7 +16,7 @@ export const GAME_CONFIG = {
     },
     spell: {
         size: 8,
-        speed: 200,
+        speed: 400,
         damage: 20,
         manaCost: 5
     },

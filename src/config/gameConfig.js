@@ -12,7 +12,7 @@ const gameConfig = {
     },
     spells: {
         fireball: {
-            speed: 200,
+            speed: 400,
             damage: 20,
             manaCost: 5
         }
