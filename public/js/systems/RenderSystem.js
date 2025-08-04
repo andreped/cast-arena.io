@@ -722,6 +722,22 @@ export class RenderSystem {
         // Move to player position
         this.ctx.translate(player.x, player.y);
         
+        // Detect if player is moving for leg animation
+        const isMoving = this.isPlayerMoving(player);
+        
+        // Draw legs first (bottom layer) - positioned below the body
+        const legSprite = this.spriteSystem.getLegSprite(direction, player.color, isMoving, player.id);
+        
+        if (legSprite) {
+            this.ctx.drawImage(
+                legSprite,
+                -(legSprite.width * scale) / 2,
+                -(legSprite.height * scale) / 2 + 8, // Offset down to show below body
+                legSprite.width * scale,
+                legSprite.height * scale
+            );
+        }
+        
         // Draw cape behind wizard for front/side views (cape should appear behind player)
         if (capeSprite && direction !== 'back') {
             // Cape appears behind the wizard for front and side views
@@ -815,6 +831,39 @@ export class RenderSystem {
         }
         
         this.ctx.restore();
+    }
+
+    // Helper method to detect if player is moving
+    isPlayerMoving(player) {
+        const currentTime = Date.now();
+        const moveThreshold = 150; // ms - if position changed recently, consider moving
+        
+        // Store previous positions for movement detection
+        if (!this.playerPreviousPositions) {
+            this.playerPreviousPositions = new Map();
+        }
+        
+        const prevData = this.playerPreviousPositions.get(player.id);
+        const currentData = {
+            x: player.x,
+            y: player.y,
+            timestamp: currentTime
+        };
+        
+        this.playerPreviousPositions.set(player.id, currentData);
+        
+        if (!prevData) {
+            return false; // No previous data, assume not moving
+        }
+        
+        // Calculate distance moved
+        const dx = currentData.x - prevData.x;
+        const dy = currentData.y - prevData.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const timeDiff = currentTime - prevData.timestamp;
+        
+        // Consider moving if traveled significant distance recently
+        return distance > 1 && timeDiff < moveThreshold;
     }
 
     drawPlayerTag(player) {

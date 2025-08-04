@@ -17,13 +17,16 @@ export class SpriteSystem {
         // Create cape sprites for all directions
         this.createCapeSprites();
         
+        // Create leg sprites for all directions and animation frames
+        this.createLegSprites();
+        
         // Create left-facing versions (flip right-facing sprites)
         this.createFlippedSprites();
     }
 
     createFlippedSprites() {
         // Create horizontally flipped versions for left-facing
-        const spritesToFlip = ['wizard_idle', 'wizard_cast', 'staff', 'cape_side'];
+        const spritesToFlip = ['wizard_idle', 'wizard_cast', 'staff', 'cape_side', 'legs_side_idle', 'legs_side_walk1', 'legs_side_walk2'];
         
         spritesToFlip.forEach(spriteName => {
             const originalSprite = this.sprites.get(spriteName);
@@ -175,6 +178,394 @@ export class SpriteSystem {
         this.drawCapePixelArt(ctx, 18, 22, 'back', null); // null = use default colors
         
         this.sprites.set('cape_back', canvas);
+    }
+
+    createLegSprites() {
+        // Create leg sprites for all directions and animation frames
+        this.createLegsSideSprites();
+        this.createLegsFrontSprites();
+        this.createLegsBackSprites();
+    }
+
+    createLegsSideSprites() {
+        // Side-view legs (for left/right facing) with walk animation
+        // Idle frame
+        this.createSingleLegSprite('legs_side_idle', 'side', 'idle');
+        // Walk frame 1 (left leg forward)
+        this.createSingleLegSprite('legs_side_walk1', 'side', 'walk1');
+        // Walk frame 2 (right leg forward)
+        this.createSingleLegSprite('legs_side_walk2', 'side', 'walk2');
+    }
+
+    createLegsFrontSprites() {
+        // Front-view legs with walk animation
+        this.createSingleLegSprite('legs_front_idle', 'front', 'idle');
+        this.createSingleLegSprite('legs_front_walk1', 'front', 'walk1');
+        this.createSingleLegSprite('legs_front_walk2', 'front', 'walk2');
+    }
+
+    createLegsBackSprites() {
+        // Back-view legs with walk animation
+        this.createSingleLegSprite('legs_back_idle', 'back', 'idle');
+        this.createSingleLegSprite('legs_back_walk1', 'back', 'walk1');
+        this.createSingleLegSprite('legs_back_walk2', 'back', 'walk2');
+    }
+
+    createSingleLegSprite(spriteName, direction, animFrame) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 28; // Increased from 20 to 28 to make legs longer
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        this.drawLegsPixelArt(ctx, 16, 14, direction, animFrame); // Adjusted centerY from 10 to 14
+        
+        this.sprites.set(spriteName, canvas);
+    }
+
+    drawLegsPixelArt(ctx, centerX, centerY, direction = 'side', animFrame = 'idle', playerColor = null) {
+        const pixel = (x, y, color, size = 1) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(centerX + x, centerY + y, size, size);
+        };
+
+        // Generate leg colors based on player color if provided
+        let pantColor, bootColor, pantShadow, bootShadow;
+        
+        if (playerColor) {
+            // Convert player color to leg color variations
+            const hex = playerColor.replace('#', '');
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+            
+            // Create pant color (darker version of player color)
+            const pantR = Math.floor(r * 0.4);
+            const pantG = Math.floor(g * 0.4);
+            const pantB = Math.floor(b * 0.4);
+            
+            // Create boot color (brown/leather)
+            const bootR = Math.min(255, Math.floor(r * 0.3 + 60));
+            const bootG = Math.min(255, Math.floor(g * 0.3 + 30));
+            const bootB = Math.floor(b * 0.2);
+            
+            pantColor = `rgb(${pantR}, ${pantG}, ${pantB})`;
+            pantShadow = `rgb(${Math.floor(pantR * 0.7)}, ${Math.floor(pantG * 0.7)}, ${Math.floor(pantB * 0.7)})`;
+            bootColor = `rgb(${bootR}, ${bootG}, ${bootB})`;
+            bootShadow = `rgb(${Math.floor(bootR * 0.7)}, ${Math.floor(bootG * 0.7)}, ${Math.floor(bootB * 0.7)})`;
+        } else {
+            // Default leg colors
+            pantColor = '#2F2F2F';    // Dark gray pants
+            pantShadow = '#1F1F1F';   // Darker shadow
+            bootColor = '#8B4513';    // Brown boots
+            bootShadow = '#654321';   // Dark brown shadow
+        }
+
+        if (direction === 'side') {
+            // Side view legs with walk animation
+            if (animFrame === 'idle') {
+                // Both legs together, standing
+                // Left leg (player's left, our right side)
+                pixel(2, -8, pantColor, 2);  // Upper thigh
+                pixel(2, -6, pantColor, 2);  // Lower thigh
+                pixel(2, -4, pantColor, 2);  // Knee
+                pixel(2, -2, pantColor, 2);  // Upper shin
+                pixel(2, 0, pantColor, 2);   // Lower shin
+                pixel(2, 2, bootColor, 2);   // Boot top
+                pixel(2, 4, bootColor, 2);   // Boot middle
+                pixel(2, 6, bootColor, 2);   // Boot bottom
+                pixel(4, 6, bootColor);      // Foot extension
+                
+                // Right leg (player's right, our left side) - slightly behind
+                pixel(-2, -8, pantColor, 2);
+                pixel(-2, -6, pantColor, 2);
+                pixel(-2, -4, pantColor, 2);
+                pixel(-2, -2, pantColor, 2);
+                pixel(-2, 0, pantColor, 2);
+                pixel(-2, 2, bootColor, 2);
+                pixel(-2, 4, bootColor, 2);
+                pixel(-2, 6, bootColor, 2);
+                pixel(-4, 6, bootColor);
+                
+                // Add shadows
+                pixel(3, -7, pantShadow);
+                pixel(3, -5, pantShadow);
+                pixel(3, 1, pantShadow);
+                pixel(3, 3, bootShadow);
+                pixel(3, 5, bootShadow);
+                pixel(-1, -7, pantShadow);
+                pixel(-1, -5, pantShadow);
+                pixel(-1, 1, pantShadow);
+                pixel(-1, 3, bootShadow);
+                pixel(-1, 5, bootShadow);
+                
+            } else if (animFrame === 'walk1') {
+                // Left leg forward, right leg back
+                // Left leg forward
+                pixel(4, -8, pantColor, 2);
+                pixel(4, -6, pantColor, 2);
+                pixel(4, -4, pantColor, 2);
+                pixel(4, -2, pantColor, 2);
+                pixel(4, 0, pantColor, 2);
+                pixel(4, 2, bootColor, 2);
+                pixel(4, 4, bootColor, 2);
+                pixel(4, 6, bootColor, 2);
+                pixel(6, 6, bootColor);
+                
+                // Right leg back
+                pixel(-4, -7, pantColor, 2);
+                pixel(-4, -5, pantColor, 2);
+                pixel(-4, -3, pantColor, 2);
+                pixel(-4, -1, pantColor, 2);
+                pixel(-4, 1, pantColor, 2);
+                pixel(-4, 3, bootColor, 2);
+                pixel(-4, 5, bootColor, 2);
+                pixel(-4, 7, bootColor, 2);
+                pixel(-6, 7, bootColor);
+                
+                // Shadows
+                pixel(5, -7, pantShadow);
+                pixel(5, 1, pantShadow);
+                pixel(5, 3, bootShadow);
+                pixel(5, 5, bootShadow);
+                pixel(-3, -6, pantShadow);
+                pixel(-3, 2, pantShadow);
+                pixel(-3, 4, bootShadow);
+                pixel(-3, 6, bootShadow);
+                
+            } else if (animFrame === 'walk2') {
+                // Right leg forward, left leg back
+                // Right leg forward
+                pixel(-4, -8, pantColor, 2);
+                pixel(-4, -6, pantColor, 2);
+                pixel(-4, -4, pantColor, 2);
+                pixel(-4, -2, pantColor, 2);
+                pixel(-4, 0, pantColor, 2);
+                pixel(-4, 2, bootColor, 2);
+                pixel(-4, 4, bootColor, 2);
+                pixel(-4, 6, bootColor, 2);
+                pixel(-6, 6, bootColor);
+                
+                // Left leg back
+                pixel(4, -7, pantColor, 2);
+                pixel(4, -5, pantColor, 2);
+                pixel(4, -3, pantColor, 2);
+                pixel(4, -1, pantColor, 2);
+                pixel(4, 1, pantColor, 2);
+                pixel(4, 3, bootColor, 2);
+                pixel(4, 5, bootColor, 2);
+                pixel(4, 7, bootColor, 2);
+                pixel(6, 7, bootColor);
+                
+                // Shadows
+                pixel(-3, -7, pantShadow);
+                pixel(-3, 1, pantShadow);
+                pixel(-3, 3, bootShadow);
+                pixel(-3, 5, bootShadow);
+                pixel(5, -6, pantShadow);
+                pixel(5, 2, pantShadow);
+                pixel(5, 4, bootShadow);
+                pixel(5, 6, bootShadow);
+            }
+            
+        } else if (direction === 'front') {
+            // Front view legs
+            if (animFrame === 'idle') {
+                // Both legs visible, standing
+                // Left leg
+                pixel(-4, -8, pantColor, 2);
+                pixel(-4, -6, pantColor, 2);
+                pixel(-4, -4, pantColor, 2);
+                pixel(-4, -2, pantColor, 2);
+                pixel(-4, 0, pantColor, 2);
+                pixel(-4, 2, bootColor, 2);
+                pixel(-4, 4, bootColor, 2);
+                pixel(-4, 6, bootColor, 2);
+                
+                // Right leg
+                pixel(2, -8, pantColor, 2);
+                pixel(2, -6, pantColor, 2);
+                pixel(2, -4, pantColor, 2);
+                pixel(2, -2, pantColor, 2);
+                pixel(2, 0, pantColor, 2);
+                pixel(2, 2, bootColor, 2);
+                pixel(2, 4, bootColor, 2);
+                pixel(2, 6, bootColor, 2);
+                
+                // Shadows
+                pixel(-3, -7, pantShadow);
+                pixel(-3, 1, pantShadow);
+                pixel(-3, 3, bootShadow);
+                pixel(-3, 5, bootShadow);
+                pixel(3, -7, pantShadow);
+                pixel(3, 1, pantShadow);
+                pixel(3, 3, bootShadow);
+                pixel(3, 5, bootShadow);
+                
+            } else if (animFrame === 'walk1') {
+                // Left leg slightly forward
+                // Left leg
+                pixel(-4, -8, pantColor, 2);
+                pixel(-4, -6, pantColor, 2);
+                pixel(-4, -4, pantColor, 2);
+                pixel(-4, -2, pantColor, 2);
+                pixel(-4, 0, pantColor, 2);
+                pixel(-4, 2, bootColor, 2);
+                pixel(-4, 4, bootColor, 2);
+                pixel(-4, 6, bootColor, 2);
+                
+                // Right leg
+                pixel(2, -7, pantColor, 2);
+                pixel(2, -5, pantColor, 2);
+                pixel(2, -3, pantColor, 2);
+                pixel(2, -1, pantColor, 2);
+                pixel(2, 1, pantColor, 2);
+                pixel(2, 3, bootColor, 2);
+                pixel(2, 5, bootColor, 2);
+                pixel(2, 7, bootColor, 2);
+                
+                // Shadows
+                pixel(-3, -7, pantShadow);
+                pixel(-3, 1, pantShadow);
+                pixel(-3, 3, bootShadow);
+                pixel(-3, 5, bootShadow);
+                pixel(3, -6, pantShadow);
+                pixel(3, 2, pantShadow);
+                pixel(3, 4, bootShadow);
+                pixel(3, 6, bootShadow);
+                
+            } else if (animFrame === 'walk2') {
+                // Right leg slightly forward
+                // Left leg
+                pixel(-4, -7, pantColor, 2);
+                pixel(-4, -5, pantColor, 2);
+                pixel(-4, -3, pantColor, 2);
+                pixel(-4, -1, pantColor, 2);
+                pixel(-4, 1, pantColor, 2);
+                pixel(-4, 3, bootColor, 2);
+                pixel(-4, 5, bootColor, 2);
+                pixel(-4, 7, bootColor, 2);
+                
+                // Right leg
+                pixel(2, -8, pantColor, 2);
+                pixel(2, -6, pantColor, 2);
+                pixel(2, -4, pantColor, 2);
+                pixel(2, -2, pantColor, 2);
+                pixel(2, 0, pantColor, 2);
+                pixel(2, 2, bootColor, 2);
+                pixel(2, 4, bootColor, 2);
+                pixel(2, 6, bootColor, 2);
+                
+                // Shadows
+                pixel(-3, -6, pantShadow);
+                pixel(-3, 2, pantShadow);
+                pixel(-3, 4, bootShadow);
+                pixel(-3, 6, bootShadow);
+                pixel(3, -7, pantShadow);
+                pixel(3, 1, pantShadow);
+                pixel(3, 3, bootShadow);
+                pixel(3, 5, bootShadow);
+            }
+            
+        } else if (direction === 'back') {
+            // Back view legs - similar to front but slightly different positioning
+            if (animFrame === 'idle') {
+                // Both legs visible from behind
+                // Left leg
+                pixel(-3, -8, pantColor, 2);
+                pixel(-3, -6, pantColor, 2);
+                pixel(-3, -4, pantColor, 2);
+                pixel(-3, -2, pantColor, 2);
+                pixel(-3, 0, pantColor, 2);
+                pixel(-3, 2, bootColor, 2);
+                pixel(-3, 4, bootColor, 2);
+                pixel(-3, 6, bootColor, 2);
+                
+                // Right leg
+                pixel(1, -8, pantColor, 2);
+                pixel(1, -6, pantColor, 2);
+                pixel(1, -4, pantColor, 2);
+                pixel(1, -2, pantColor, 2);
+                pixel(1, 0, pantColor, 2);
+                pixel(1, 2, bootColor, 2);
+                pixel(1, 4, bootColor, 2);
+                pixel(1, 6, bootColor, 2);
+                
+                // Shadows
+                pixel(-2, -7, pantShadow);
+                pixel(-2, 1, pantShadow);
+                pixel(-2, 3, bootShadow);
+                pixel(-2, 5, bootShadow);
+                pixel(2, -7, pantShadow);
+                pixel(2, 1, pantShadow);
+                pixel(2, 3, bootShadow);
+                pixel(2, 5, bootShadow);
+                
+            } else if (animFrame === 'walk1') {
+                // Left leg forward (less visible from back)
+                // Left leg
+                pixel(-3, -8, pantColor, 2);
+                pixel(-3, -6, pantColor, 2);
+                pixel(-3, -4, pantColor, 2);
+                pixel(-3, -2, pantColor, 2);
+                pixel(-3, 0, pantColor, 2);
+                pixel(-3, 2, bootColor, 2);
+                pixel(-3, 4, bootColor, 2);
+                pixel(-3, 6, bootColor, 2);
+                
+                // Right leg back
+                pixel(1, -7, pantColor, 2);
+                pixel(1, -5, pantColor, 2);
+                pixel(1, -3, pantColor, 2);
+                pixel(1, -1, pantColor, 2);
+                pixel(1, 1, pantColor, 2);
+                pixel(1, 3, bootColor, 2);
+                pixel(1, 5, bootColor, 2);
+                pixel(1, 7, bootColor, 2);
+                
+                // Shadows
+                pixel(-2, -7, pantShadow);
+                pixel(-2, 1, pantShadow);
+                pixel(-2, 3, bootShadow);
+                pixel(-2, 5, bootShadow);
+                pixel(2, -6, pantShadow);
+                pixel(2, 2, pantShadow);
+                pixel(2, 4, bootShadow);
+                pixel(2, 6, bootShadow);
+                
+            } else if (animFrame === 'walk2') {
+                // Right leg forward
+                // Left leg back
+                pixel(-3, -7, pantColor, 2);
+                pixel(-3, -5, pantColor, 2);
+                pixel(-3, -3, pantColor, 2);
+                pixel(-3, -1, pantColor, 2);
+                pixel(-3, 1, pantColor, 2);
+                pixel(-3, 3, bootColor, 2);
+                pixel(-3, 5, bootColor, 2);
+                pixel(-3, 7, bootColor, 2);
+                
+                // Right leg
+                pixel(1, -8, pantColor, 2);
+                pixel(1, -6, pantColor, 2);
+                pixel(1, -4, pantColor, 2);
+                pixel(1, -2, pantColor, 2);
+                pixel(1, 0, pantColor, 2);
+                pixel(1, 2, bootColor, 2);
+                pixel(1, 4, bootColor, 2);
+                pixel(1, 6, bootColor, 2);
+                
+                // Shadows
+                pixel(-2, -6, pantShadow);
+                pixel(-2, 2, pantShadow);
+                pixel(-2, 4, bootShadow);
+                pixel(-2, 6, bootShadow);
+                pixel(2, -7, pantShadow);
+                pixel(2, 1, pantShadow);
+                pixel(2, 3, bootShadow);
+                pixel(2, 5, bootShadow);
+            }
+        }
     }
 
     drawWizardPixelArt(ctx, centerX, centerY, pose = 'idle') {
@@ -680,6 +1071,30 @@ export class SpriteSystem {
         return canvas;
     }
 
+    // Create colored version of leg sprite
+    createColoredLegSprite(direction, animFrame, playerColor) {
+        const spriteKey = `legs_${direction}_${animFrame}_${playerColor}`;
+        
+        if (this.sprites.has(spriteKey)) {
+            return this.sprites.get(spriteKey);
+        }
+
+        // Create new canvas for colored legs
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 20;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.imageSmoothingEnabled = false;
+        
+        // Draw legs with player-specific colors
+        this.drawLegsPixelArt(ctx, 16, 10, direction, animFrame, playerColor);
+        
+        // Cache the colored leg sprite
+        this.sprites.set(spriteKey, canvas);
+        return canvas;
+    }
+
     // Create colored version of wizard sprite
     createColoredWizardSprite(color, pose = 'idle', facingLeft = false) {
         const facingSuffix = facingLeft ? '_left' : '';
@@ -889,6 +1304,62 @@ export class SpriteSystem {
             default:
                 return this.sprites.get('cape_side');
         }
+    }
+
+    // Get appropriate leg sprite based on direction and movement
+    getLegSprite(direction, playerColor = null, isMoving = false, playerId = null) {
+        // Determine animation frame based on movement
+        let animFrame = 'idle';
+        
+        if (isMoving && playerId) {
+            // Create walking animation based on time
+            const walkSpeed = 8; // Animation speed
+            const currentTime = Date.now();
+            const walkCycle = Math.floor((currentTime / (1000 / walkSpeed)) % 2);
+            animFrame = walkCycle === 0 ? 'walk1' : 'walk2';
+        }
+
+        // Handle left-facing (flipped) legs
+        if (direction === 'left') {
+            if (playerColor) {
+                const flippedKey = `legs_side_${animFrame}_left_${playerColor}`;
+                if (!this.sprites.has(flippedKey)) {
+                    // Create flipped version of the colored side legs
+                    const originalSprite = this.createColoredLegSprite('side', animFrame, playerColor);
+                    const flippedCanvas = document.createElement('canvas');
+                    flippedCanvas.width = originalSprite.width;
+                    flippedCanvas.height = originalSprite.height;
+                    const ctx = flippedCanvas.getContext('2d');
+                    
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(originalSprite, -originalSprite.width, 0);
+                    
+                    this.sprites.set(flippedKey, flippedCanvas);
+                }
+                return this.sprites.get(flippedKey);
+            } else {
+                // Use default left-facing legs
+                return this.sprites.get(`legs_side_${animFrame}_left`);
+            }
+        }
+
+        // Handle other directions
+        if (playerColor) {
+            let actualDirection = direction;
+            if (direction === 'right') {
+                actualDirection = 'side';
+            }
+            return this.createColoredLegSprite(actualDirection, animFrame, playerColor);
+        }
+        
+        // Fallback to default leg sprites
+        let actualDirection = direction;
+        if (direction === 'right') {
+            actualDirection = 'side';
+        }
+        
+        return this.sprites.get(`legs_${actualDirection}_${animFrame}`);
     }
 
     // Animation system for staff casting
