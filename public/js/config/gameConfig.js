@@ -51,6 +51,6 @@ export const GAME_CONFIG = {
                 weight: 0.1
             }
         },
-        seed: 42
+        seed: Math.floor(Math.random() * 1000000) // Random seed for each page load
     }
 };
