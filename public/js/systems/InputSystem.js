@@ -666,7 +666,7 @@ export class InputSystem {
                 // Update server TPS only if we have valid data and enough time has passed
                 const tpsColor = this.getTpsColor(this.serverTps);
                 const tpsEfficiency = this.targetTps > 0 ? (this.serverTps / this.targetTps * 100).toFixed(0) : 100;
-                serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${this.serverTps}/${this.targetTps} TPS</span> <span style="color: #888; font-size: 10px;">(${tpsEfficiency}%)</span>`;
+                serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${this.serverTps} TPS</span>`;
             }
             
             // Update average frame time

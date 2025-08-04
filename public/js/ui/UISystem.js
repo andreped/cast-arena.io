@@ -350,6 +350,14 @@ export class UISystem {
             }
         }
 
+        // Check for recent mana pickups
+        if (myPlayer.recentManaPickups && myPlayer.recentManaPickups.length > 0) {
+            const totalRecentMana = myPlayer.getTotalRecentMana();
+            if (totalRecentMana > 0) {
+                effects.push(`💙 Mana Restored: +${totalRecentMana}`);
+            }
+        }
+
         // Add other effects here in the future (health, shield, etc.)
         
         if (effects.length > 0) {

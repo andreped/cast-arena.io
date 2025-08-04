@@ -3,6 +3,7 @@ import { Player } from './entities/Player.js';
 import { Spell } from './entities/Spell.js';
 import { Wall } from './entities/Wall.js';
 import { SpeedItem } from './entities/SpeedItem.js';
+import { ManaItem } from './entities/ManaItem.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { RenderSystem } from './systems/RenderSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
@@ -164,7 +165,15 @@ export class Game {
 
     // Item management methods
     addItem(itemData) {
-        const item = new SpeedItem(itemData);
+        let item;
+        if (itemData.type === 'speed') {
+            item = new SpeedItem(itemData);
+        } else if (itemData.type === 'mana') {
+            item = new ManaItem(itemData);
+        } else {
+            console.warn('Unknown item type:', itemData.type);
+            return;
+        }
         this.items.set(item.id, item);
     }
 

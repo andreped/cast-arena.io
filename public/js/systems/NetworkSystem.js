@@ -161,8 +161,18 @@ export class NetworkSystem {
     handleManaUpdate(data) {
         const player = this.game.players.get(data.id);
         if (player) {
+            const oldMana = player.mana;
             player.mana = data.mana;
             player.maxMana = data.maxMana;
+            
+            // If this is our player and mana increased significantly, it's likely from a pickup
+            if (data.id === this.game.myId && data.mana > oldMana) {
+                const manaGained = data.mana - oldMana;
+                // Only track significant mana gains (5+ mana) to avoid showing regen
+                if (manaGained >= 5) {
+                    player.addRecentManaPickup(manaGained);
+                }
+            }
         }
     }
 
@@ -261,7 +271,7 @@ export class NetworkSystem {
             const tpsColor = data.tps >= data.target * 0.9 ? '#00ff00' : 
                            data.tps >= data.target * 0.7 ? '#ffaa00' : '#ff0000';
             const tpsEfficiency = ((data.tps / data.target) * 100).toFixed(0);
-            serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${data.tps}/${data.target} TPS</span> <span style="color: #888; font-size: 10px;">(${tpsEfficiency}%)</span>`;
+            serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${data.tps} TPS</span>`;
         }
     }
 }

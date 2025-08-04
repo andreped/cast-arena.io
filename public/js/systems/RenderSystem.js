@@ -366,6 +366,43 @@ export class RenderSystem {
             this.ctx.lineTo(size * 0.05, size * 0.2);
             this.ctx.closePath();
             this.ctx.fill();
+        } else if (item.type === 'mana') {
+            // Draw blue mana item with droplet symbol
+            const size = 10;
+            
+            // Outer blue glow
+            this.ctx.shadowColor = '#0080FF';
+            this.ctx.shadowBlur = 20;
+            this.ctx.fillStyle = 'rgba(0, 128, 255, 0.3)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Middle blue circle
+            this.ctx.shadowBlur = 10;
+            this.ctx.fillStyle = 'rgba(0, 128, 255, 0.6)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Inner bright blue core
+            this.ctx.shadowBlur = 5;
+            this.ctx.fillStyle = 'rgba(100, 180, 255, 0.9)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size * 0.6, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Draw mana droplet symbol
+            this.ctx.shadowBlur = 0;
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.beginPath();
+            // Droplet shape - teardrop
+            this.ctx.moveTo(0, -size * 0.5);
+            this.ctx.quadraticCurveTo(size * 0.3, -size * 0.2, size * 0.3, size * 0.1);
+            this.ctx.quadraticCurveTo(size * 0.3, size * 0.4, 0, size * 0.5);
+            this.ctx.quadraticCurveTo(-size * 0.3, size * 0.4, -size * 0.3, size * 0.1);
+            this.ctx.quadraticCurveTo(-size * 0.3, -size * 0.2, 0, -size * 0.5);
+            this.ctx.fill();
         }
         
         this.ctx.restore();
@@ -843,6 +880,13 @@ export class RenderSystem {
                 
                 // Add a small glow effect on minimap
                 this.minimapCtx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+                this.minimapCtx.fillRect(x - dotSize, y - dotSize, dotSize * 2, dotSize * 2);
+            } else if (item.type === 'mana') {
+                this.minimapCtx.fillStyle = '#0080FF'; // Bright blue for mana items
+                this.minimapCtx.fillRect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+                
+                // Add a small blue glow effect on minimap
+                this.minimapCtx.fillStyle = 'rgba(0, 128, 255, 0.5)';
                 this.minimapCtx.fillRect(x - dotSize, y - dotSize, dotSize * 2, dotSize * 2);
             }
         });
