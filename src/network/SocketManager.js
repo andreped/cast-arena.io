@@ -50,7 +50,7 @@ class SocketManager {
     handlePlayerMovement(socket, movementData) {
         const player = this.gameState.getPlayer(socket.id);
         
-        if (!player || !player.isAlive || player.respawnImmunity) {
+        if (!player || !player.isAlive) {
             return;
         }
 

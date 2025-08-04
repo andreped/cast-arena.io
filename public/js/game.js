@@ -14,6 +14,26 @@ export class Game {
         // Initialize main elements
         this.canvas = document.getElementById('gameCanvas');
         this.minimapCanvas = document.getElementById('minimapCanvas');
+        
+        // Make canvas focusable and auto-focus for immediate keyboard input
+        this.canvas.setAttribute('tabindex', '0');
+        this.canvas.focus();
+        
+        // Add a visual indicator when canvas has focus (optional)
+        this.canvas.addEventListener('focus', () => {
+            this.canvas.style.outline = '2px solid rgba(255, 255, 255, 0.3)';
+            // Hide any focus hint if it exists
+            const focusHint = document.getElementById('focusHint');
+            if (focusHint) {
+                focusHint.style.display = 'none';
+            }
+        });
+        this.canvas.addEventListener('blur', () => {
+            this.canvas.style.outline = 'none';
+            // Show focus hint
+            this.showFocusHint();
+        });
+        
         this.players = new Map();
         this.spells = new Map();
         this.walls = new Map();
@@ -38,6 +58,45 @@ export class Game {
         // Start game loop
         this.lastUpdateTime = performance.now();
         this.gameLoop();
+    }
+
+    showFocusHint() {
+        // Create or show focus hint
+        let focusHint = document.getElementById('focusHint');
+        if (!focusHint) {
+            focusHint = document.createElement('div');
+            focusHint.id = 'focusHint';
+            focusHint.innerHTML = 'Click here to enable keyboard controls (WASD)';
+            focusHint.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 10px 20px;
+                border-radius: 5px;
+                border: 2px solid #fff;
+                font-family: Arial, sans-serif;
+                font-size: 16px;
+                pointer-events: none;
+                z-index: 1000;
+                animation: pulse 2s infinite;
+            `;
+            
+            // Add pulsing animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes pulse {
+                    0%, 100% { opacity: 0.7; }
+                    50% { opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            this.canvas.parentElement.appendChild(focusHint);
+        }
+        focusHint.style.display = 'block';
     }
 
     gameLoop() {
