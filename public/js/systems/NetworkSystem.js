@@ -241,7 +241,8 @@ export class NetworkSystem {
 
     sendMovement(movementData) {
         const now = performance.now();
-        if (now - this.lastMovementUpdate >= this.movementUpdateInterval) {
+        // Increased throttling rate to 60 FPS for more responsive movement
+        if (now - this.lastMovementUpdate >= 16.67) { // ~60 FPS
             this.socket.emit('playerMovement', movementData);
             this.lastMovementUpdate = now;
         }

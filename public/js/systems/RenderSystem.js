@@ -710,8 +710,9 @@ export class RenderSystem {
             direction = player.facingLeft ? 'left' : 'right';
         }
         
-        // Get directional wizard sprite (body doesn't change with every angle)
+        // Get directional wizard and cape sprites
         const wizardSprite = this.spriteSystem.getWizardSpriteForDirection(direction, player.color, pose);
+        const capeSprite = this.spriteSystem.getCapeSprite(direction, player.color);
         
         if (!wizardSprite) return;
         
@@ -721,6 +722,39 @@ export class RenderSystem {
         // Move to player position
         this.ctx.translate(player.x, player.y);
         
+        // Detect if player is moving for leg animation
+        const isMoving = this.isPlayerMoving(player);
+        
+        // Draw legs first (bottom layer) - positioned below the body
+        const legSprite = this.spriteSystem.getLegSprite(direction, player.color, isMoving, player.id);
+        
+        if (legSprite) {
+            this.ctx.drawImage(
+                legSprite,
+                -(legSprite.width * scale) / 2,
+                -(legSprite.height * scale) / 2 + 8, // Offset down to show below body
+                legSprite.width * scale,
+                legSprite.height * scale
+            );
+        }
+        
+        // Draw cape behind wizard for front/side views (cape should appear behind player)
+        if (capeSprite && direction !== 'back') {
+            // Cape appears behind the wizard for front and side views
+            this.ctx.save();
+            this.ctx.translate(0, 2); // Slightly lower to appear behind
+            
+            this.ctx.drawImage(
+                capeSprite,
+                -(capeSprite.width * scale) / 2,
+                -(capeSprite.height * scale) / 2,
+                capeSprite.width * scale,
+                capeSprite.height * scale
+            );
+            
+            this.ctx.restore();
+        }
+        
         // Draw wizard sprite centered at origin
         this.ctx.drawImage(
             wizardSprite,
@@ -729,6 +763,17 @@ export class RenderSystem {
             wizardSprite.width * scale,
             wizardSprite.height * scale
         );
+        
+        // Draw cape in front when facing away (we see the back of the cape)
+        if (capeSprite && direction === 'back') {
+            this.ctx.drawImage(
+                capeSprite,
+                -(capeSprite.width * scale) / 2,
+                -(capeSprite.height * scale) / 2,
+                capeSprite.width * scale,
+                capeSprite.height * scale
+            );
+        }
         
         // Draw staff with 360-degree rotation following mouse
         this.drawStaffWithAngle(aimingAngle, castAnimationRotation, scale);
@@ -786,6 +831,39 @@ export class RenderSystem {
         }
         
         this.ctx.restore();
+    }
+
+    // Helper method to detect if player is moving
+    isPlayerMoving(player) {
+        const currentTime = Date.now();
+        const moveThreshold = 150; // ms - if position changed recently, consider moving
+        
+        // Store previous positions for movement detection
+        if (!this.playerPreviousPositions) {
+            this.playerPreviousPositions = new Map();
+        }
+        
+        const prevData = this.playerPreviousPositions.get(player.id);
+        const currentData = {
+            x: player.x,
+            y: player.y,
+            timestamp: currentTime
+        };
+        
+        this.playerPreviousPositions.set(player.id, currentData);
+        
+        if (!prevData) {
+            return false; // No previous data, assume not moving
+        }
+        
+        // Calculate distance moved
+        const dx = currentData.x - prevData.x;
+        const dy = currentData.y - prevData.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const timeDiff = currentTime - prevData.timestamp;
+        
+        // Consider moving if traveled significant distance recently
+        return distance > 1 && timeDiff < moveThreshold;
     }
 
     drawPlayerTag(player) {
