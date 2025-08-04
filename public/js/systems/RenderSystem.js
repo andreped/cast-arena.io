@@ -697,9 +697,12 @@ export class RenderSystem {
         
         // Get current animation state
         const pose = this.spriteSystem.getCastPose(player.id);
-        const staffRotation = this.spriteSystem.getStaffRotation(player.id);
+        const castAnimationRotation = this.spriteSystem.getStaffRotation(player.id);
         
-        // Use aiming angle if available, otherwise fall back to facingLeft
+        // Use aiming angle for smooth 360-degree staff rotation
+        const aimingAngle = player.aimingAngle !== undefined ? player.aimingAngle : 0;
+        
+        // Determine wizard body direction (still use 4-directional for body sprite)
         let direction;
         if (player.aimingAngle !== undefined) {
             direction = this.spriteSystem.getDirectionFromAngle(player.aimingAngle);
@@ -707,11 +710,10 @@ export class RenderSystem {
             direction = player.facingLeft ? 'left' : 'right';
         }
         
-        // Get directional wizard and staff sprites
+        // Get directional wizard sprite (body doesn't change with every angle)
         const wizardSprite = this.spriteSystem.getWizardSpriteForDirection(direction, player.color, pose);
-        const staffSprite = this.spriteSystem.getStaffSpriteForDirection(direction, staffRotation);
         
-        if (!wizardSprite || !staffSprite) return;
+        if (!wizardSprite) return;
         
         // Position and scale
         const scale = 2; // Scale up pixel art for better visibility
@@ -719,7 +721,7 @@ export class RenderSystem {
         // Move to player position
         this.ctx.translate(player.x, player.y);
         
-        // Draw wizard sprite centered at origin (no horizontal flipping needed - sprites are pre-rendered for each direction)
+        // Draw wizard sprite centered at origin
         this.ctx.drawImage(
             wizardSprite,
             -(wizardSprite.width * scale) / 2,
@@ -728,41 +730,60 @@ export class RenderSystem {
             wizardSprite.height * scale
         );
         
-        // Draw staff at appropriate position based on direction
+        // Draw staff with 360-degree rotation following mouse
+        this.drawStaffWithAngle(aimingAngle, castAnimationRotation, scale);
+        
+        this.ctx.restore();
+    }
+
+    drawStaffWithAngle(aimingAngle, castAnimationRotation, scale) {
         this.ctx.save();
         
-        // Staff position varies by direction
-        let staffX, staffY;
-        if (direction === 'left') {
-            staffX = -25; // Staff on left side
-            staffY = -5;
-        } else if (direction === 'right') {
-            staffX = 25; // Staff on right side
-            staffY = -5;
-        } else if (direction === 'front') {
-            staffX = 15; // Staff slightly to the right when facing forward
-            staffY = 0;
-        } else { // back
-            staffX = -15; // Staff slightly to the left when facing away
-            staffY = 0;
-        }
+        // Staff positioning relative to player center
+        const staffDistance = 20; // Distance from player center
+        
+        // Normalize angle to 0-2π for consistent calculations
+        const normalizedAngle = ((aimingAngle % (Math.PI * 2)) + (Math.PI * 2)) % (Math.PI * 2);
+        
+        // Determine if staff should be flipped (Terraria-style)
+        // Flip when pointing towards the left half of the circle (π/2 to 3π/2)
+        const shouldFlip = normalizedAngle > Math.PI / 2 && normalizedAngle < (3 * Math.PI / 2);
+        
+        // Calculate staff position based on aiming angle
+        const staffX = Math.cos(aimingAngle) * staffDistance;
+        const staffY = Math.sin(aimingAngle) * staffDistance;
         
         this.ctx.translate(staffX, staffY);
         
-        // For horizontal directions, apply rotation for casting animation
-        if (direction === 'left' || direction === 'right') {
-            this.ctx.rotate(staffRotation);
+        // Apply staff rotation and flipping
+        let finalRotation = aimingAngle;
+        
+        // Add casting animation rotation
+        finalRotation += castAnimationRotation;
+        
+        // If flipped, we need to handle this differently
+        if (shouldFlip) {
+            // For left side, we want to flip the staff and adjust the rotation
+            // First rotate, then flip
+            this.ctx.rotate(finalRotation);
+            this.ctx.scale(1, -1); // Flip vertically after rotation
+        } else {
+            // Normal rotation for right side
+            this.ctx.rotate(finalRotation);
         }
         
-        this.ctx.drawImage(
-            staffSprite,
-            -(staffSprite.width * scale) / 2,
-            -(staffSprite.height * scale) / 2,
-            staffSprite.width * scale,
-            staffSprite.height * scale
-        );
+        // Get base staff sprite (we'll use the horizontal one and rotate it)
+        const staffSprite = this.spriteSystem.sprites.get('staff');
         
-        this.ctx.restore();
+        if (staffSprite) {
+            this.ctx.drawImage(
+                staffSprite,
+                -(staffSprite.width * scale) / 2,
+                -(staffSprite.height * scale) / 2,
+                staffSprite.width * scale,
+                staffSprite.height * scale
+            );
+        }
         
         this.ctx.restore();
     }
