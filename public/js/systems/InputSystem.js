@@ -56,6 +56,7 @@ export class InputSystem {
         this.maxFrameTimeHistory = 60; // Keep last 60 frame times
         this.serverTps = 0; // Server ticks per second
         this.targetTps = 20; // Expected server TPS
+        this.lastTpsUpdateTime = 0; // Track when TPS was last updated from network
         
         // Enhanced FPS debugging
         this.fpsHistory = [];
@@ -82,10 +83,6 @@ export class InputSystem {
 
         // Initialize debug tools
         this.exposeDebugToConsole();
-        if (this.debugMode) {
-            this.addDebugLog('🚀 InputSystem initialized in DEBUG mode');
-            this.initDebugOverlay();
-        }
         
         // Always initialize FPS monitor
         this.initFpsMonitor();
@@ -660,10 +657,17 @@ export class InputSystem {
             const fpsColor = this.getFpsColor(this.currentFps);
             clientFpsEl.innerHTML = `Client: <span style="color: ${fpsColor};">${this.currentFps} FPS</span>`;
             
-            // Update server TPS
-            const tpsColor = this.getTpsColor(this.serverTps);
-            const tpsEfficiency = this.targetTps > 0 ? (this.serverTps / this.targetTps * 100).toFixed(0) : 100;
-            serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${this.serverTps}/${this.targetTps} TPS</span> <span style="color: #888; font-size: 10px;">(${tpsEfficiency}%)</span>`;
+            // Only update server TPS if it hasn't been recently updated by NetworkSystem
+            // Give NetworkSystem 1.5 seconds priority to avoid overwriting fresh TPS data
+            const timeSinceLastTpsUpdate = performance.now() - this.lastTpsUpdateTime;
+            const shouldUpdateTps = timeSinceLastTpsUpdate > 1500; // 1.5 seconds
+            
+            if (shouldUpdateTps && this.serverTps > 0) {
+                // Update server TPS only if we have valid data and enough time has passed
+                const tpsColor = this.getTpsColor(this.serverTps);
+                const tpsEfficiency = this.targetTps > 0 ? (this.serverTps / this.targetTps * 100).toFixed(0) : 100;
+                serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${this.serverTps}/${this.targetTps} TPS</span> <span style="color: #888; font-size: 10px;">(${tpsEfficiency}%)</span>`;
+            }
             
             // Update average frame time
             const avgFrameTime = this.frameTimes.length > 0 ? 
@@ -697,6 +701,7 @@ export class InputSystem {
     // Method to receive server TPS from network
     updateServerTps(tps) {
         this.serverTps = tps;
+        this.lastTpsUpdateTime = performance.now();
     }
 
     initFpsMonitor() {
