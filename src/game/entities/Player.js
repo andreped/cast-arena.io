@@ -28,6 +28,9 @@ class Player {
         // Smooth movement system properties (mainly for client-server sync)
         this.velocityX = 0;
         this.velocityY = 0;
+        
+        // Ring of Fire inventory
+        this.ringOfFireCharges = 0;
     }
 
     getRandomColor() {
@@ -179,6 +182,26 @@ class Player {
         this.lastBroadcastMana = this.mana;
     }
 
+    // Ring of Fire methods
+    addRingOfFireCharge() {
+        this.ringOfFireCharges++;
+        console.log(`Player ${this.id} now has ${this.ringOfFireCharges} Ring of Fire charges`);
+    }
+
+    useRingOfFire() {
+        if (this.ringOfFireCharges > 0 && this.mana >= 25) {
+            this.ringOfFireCharges--;
+            this.consumeMana(25);
+            console.log(`Player ${this.id} used Ring of Fire! Charges remaining: ${this.ringOfFireCharges}`);
+            return true;
+        }
+        return false;
+    }
+
+    hasRingOfFire() {
+        return this.ringOfFireCharges > 0;
+    }
+
     toJSON() {
         return {
             id: this.id,
@@ -196,7 +219,8 @@ class Player {
             facingLeft: this.facingLeft,
             aimingAngle: this.aimingAngle,
             currentSpeedMultiplier: this.currentSpeedMultiplier,
-            speedBuffs: this.speedBuffs
+            speedBuffs: this.speedBuffs,
+            ringOfFireCharges: this.ringOfFireCharges
         };
     }
 }

@@ -134,6 +134,9 @@ export class UISystem {
         this.healthTooltip = document.getElementById('healthTooltip');
         this.manaTooltip = document.getElementById('manaTooltip');
         
+        // Create Ring of Fire indicator
+        this.createRingOfFireIndicator();
+        
         // Setup hover events for instant tooltips
         this.setupTooltipEvents();
         
@@ -141,6 +144,168 @@ export class UISystem {
         if (this.playerStats) {
             this.playerStats.style.display = 'none';
         }
+    }
+
+    createRingOfFireIndicator() {
+        // Get the game area container to position relative to it
+        const gameArea = document.getElementById('gameArea');
+        
+        // Create inventory panel container if it doesn't exist
+        let inventoryPanel = document.getElementById('inventoryPanel');
+        if (!inventoryPanel) {
+            inventoryPanel = document.createElement('div');
+            inventoryPanel.id = 'inventoryPanel';
+            inventoryPanel.style.cssText = `
+                position: absolute;
+                top: 82px;
+                left: 10px;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                z-index: 100;
+            `;
+            gameArea.appendChild(inventoryPanel);
+        }
+        
+        // Create Ring of Fire inventory slot container (half size)
+        const slotContainer = document.createElement('div');
+        slotContainer.id = 'ringOfFireSlot';
+        slotContainer.style.cssText = `
+            position: relative;
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #2c1810, #4a2c18, #2c1810);
+            border: 1px solid #8B4513;
+            border-radius: 4px;
+            display: none;
+            box-shadow: 
+                inset 0 0 5px rgba(0,0,0,0.5),
+                0 1px 4px rgba(0,0,0,0.3);
+        `;
+        
+        // Create the Ring of Fire icon (smaller)
+        const iconDiv = document.createElement('div');
+        iconDiv.style.cssText = `
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 26px;
+            height: 26px;
+            background: radial-gradient(circle, #FF4500 20%, #FF8C00 50%, #FFA500 80%);
+            border: 1px solid #FFD700;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 
+                0 0 8px rgba(255,69,0,0.6),
+                inset 0 0 5px rgba(255,215,0,0.3);
+            transition: all 0.2s ease;
+        `;
+        // Use a more static ring of fire representation with CSS (smaller)
+        iconDiv.innerHTML = `
+            <div style="
+                position: relative;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            ">
+                <div style="
+                    width: 18px;
+                    height: 18px;
+                    border: 2px solid #FF6B35;
+                    border-radius: 50%;
+                    background: radial-gradient(circle, transparent 40%, #FF4500 70%, #FF8C00 85%, transparent 100%);
+                    position: relative;
+                ">
+                    <div style="
+                        position: absolute;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        font-size: 8px;
+                    ">🔥</div>
+                </div>
+            </div>
+        `;
+        iconDiv.title = 'Ring of Fire - Press 1 to activate (25 mana)';
+        
+        // Create key binding indicator (smaller)
+        const keyDiv = document.createElement('div');
+        keyDiv.style.cssText = `
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 8px;
+            background: linear-gradient(135deg, #3a3a3a, #5a5a5a);
+            border: 1px solid #777;
+            border-radius: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 6px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+            box-shadow: 0 1px 1px rgba(0,0,0,0.5);
+        `;
+        keyDiv.textContent = '1';
+        
+        // Create charge counter (smaller)
+        const chargeDiv = document.createElement('div');
+        chargeDiv.id = 'ringOfFireCharges';
+        chargeDiv.style.cssText = `
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #FF1493, #DC143C);
+            border: 1px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 7px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.8);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        `;
+        chargeDiv.textContent = '0';
+        
+        // Add hover effect
+        iconDiv.addEventListener('mouseenter', () => {
+            iconDiv.style.transform = 'scale(1.05)';
+            iconDiv.style.boxShadow = '0 0 20px rgba(255,69,0,0.8), inset 0 0 15px rgba(255,215,0,0.4)';
+        });
+        
+        iconDiv.addEventListener('mouseleave', () => {
+            iconDiv.style.transform = 'scale(1)';
+            iconDiv.style.boxShadow = '0 0 15px rgba(255,69,0,0.6), inset 0 0 10px rgba(255,215,0,0.3)';
+        });
+        
+        // Add click handler for activation
+        iconDiv.addEventListener('click', () => {
+            // Simulate pressing "1" key
+            const event = new KeyboardEvent('keydown', { key: '1' });
+            document.dispatchEvent(event);
+        });
+        
+        slotContainer.appendChild(iconDiv);
+        slotContainer.appendChild(keyDiv);
+        slotContainer.appendChild(chargeDiv);
+        
+        inventoryPanel.appendChild(slotContainer);
+        this.ringOfFireIndicator = slotContainer;
+        this.ringOfFireCharges = chargeDiv;
+        this.ringOfFireIcon = iconDiv;
     }
 
     setupTooltipEvents() {
@@ -230,6 +395,33 @@ export class UISystem {
             this.manaFill.style.background = 'linear-gradient(90deg, #FF9800, #FFB74D)';
         } else {
             this.manaFill.style.background = 'linear-gradient(90deg, #F44336, #EF5350)';
+        }
+        
+        // Update Ring of Fire indicator
+        this.updateRingOfFireIndicator(player);
+    }
+
+    updateRingOfFireIndicator(player) {
+        if (!this.ringOfFireIndicator || !this.ringOfFireCharges) return;
+        
+        if (player.ringOfFireCharges > 0) {
+            this.ringOfFireIndicator.style.display = 'block';
+            
+            // Update charge count display
+            this.ringOfFireCharges.textContent = player.ringOfFireCharges;
+            
+            // Add pulsing effect if player has enough mana to use it
+            if (player.mana >= 25) {
+                this.ringOfFireIcon.style.animation = 'ringOfFirePulse 2s infinite';
+                this.ringOfFireIcon.style.opacity = '1';
+                this.ringOfFireIcon.style.filter = 'brightness(1.2)';
+            } else {
+                this.ringOfFireIcon.style.animation = 'none';
+                this.ringOfFireIcon.style.opacity = '0.6';
+                this.ringOfFireIcon.style.filter = 'brightness(0.7) grayscale(0.3)';
+            }
+        } else {
+            this.ringOfFireIndicator.style.display = 'none';
         }
     }
 

@@ -4,6 +4,7 @@ import { Spell } from './entities/Spell.js';
 import { Wall } from './entities/Wall.js';
 import { SpeedItem } from './entities/SpeedItem.js';
 import { ManaItem } from './entities/ManaItem.js';
+import { RingOfFireItem } from './entities/RingOfFireItem.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { RenderSystem } from './systems/RenderSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
@@ -229,6 +230,8 @@ export class Game {
             item = new SpeedItem(itemData);
         } else if (itemData.type === 'mana') {
             item = new ManaItem(itemData);
+        } else if (itemData.type === 'ringOfFire') {
+            item = new RingOfFireItem(itemData);
         } else {
             console.warn('Unknown item type:', itemData.type);
             return;

@@ -1379,24 +1379,98 @@ export class SpriteSystem {
         }, animation.duration);
     }
 
+    // Gandalf-style Ring of Fire casting animation
+    createRingOfFireCastAnimation(playerId) {
+        const animation = {
+            type: 'ringOfFire',
+            startTime: Date.now(),
+            duration: 1200, // 1.2 second dramatic animation
+            phase: 'raise' // raise -> slam -> hold -> return
+        };
+        
+        this.animations.set(playerId, animation);
+        
+        // Auto-remove animation after duration
+        setTimeout(() => {
+            this.animations.delete(playerId);
+        }, animation.duration);
+    }
+
+    // Create Ring of Fire visual effect
+    createRingOfFireEffect(data) {
+        const effect = {
+            id: data.id,
+            x: data.x,
+            y: data.y,
+            radius: data.radius,
+            startTime: Date.now(),
+            duration: 2500, // Effect lasts 2.5 seconds (was 1.5)
+            maxRadius: data.radius,
+            expandTime: 800, // Ring expands for 800ms (was 400ms)
+            holdTime: 1200, // Ring holds for 1.2 seconds (was 800ms)
+            fadeTime: 500 // Ring fades for 500ms (was 300ms)
+        };
+        
+        this.ringOfFireEffects = this.ringOfFireEffects || new Map();
+        this.ringOfFireEffects.set(data.id, effect);
+        
+        // Auto-remove effect after duration
+        setTimeout(() => {
+            if (this.ringOfFireEffects) {
+                this.ringOfFireEffects.delete(data.id);
+            }
+        }, effect.duration);
+    }
+
     getAnimationState(playerId) {
         return this.animations.get(playerId);
     }
 
     getStaffRotation(playerId) {
         const animation = this.getAnimationState(playerId);
-        if (!animation || animation.type !== 'cast') {
+        if (!animation) {
             return 0; // No rotation when not casting
         }
 
         const elapsed = Date.now() - animation.startTime;
         const progress = Math.min(elapsed / animation.duration, 1);
         
-        // Smooth rotation: 0° -> 20° -> 0°
-        const maxRotation = 20 * Math.PI / 180; // 20 degrees in radians
-        const rotation = Math.sin(progress * Math.PI) * maxRotation;
+        if (animation.type === 'cast') {
+            // Regular spell cast: 0° -> 20° -> 0°
+            const maxRotation = 20 * Math.PI / 180; // 20 degrees in radians
+            const rotation = Math.sin(progress * Math.PI) * maxRotation;
+            return rotation;
+        } else if (animation.type === 'ringOfFire') {
+            // Gandalf-style Ring of Fire: raise -> slam down -> hold -> return
+            const phases = {
+                raise: 0.25,    // 25% of animation
+                slam: 0.15,     // 15% of animation  
+                hold: 0.4,      // 40% of animation
+                return: 0.2     // 20% of animation
+            };
+            
+            if (progress < phases.raise) {
+                // Raise staff high above head
+                const phaseProgress = progress / phases.raise;
+                return -Math.PI * 0.6 * phaseProgress; // Raise to -108 degrees
+            } else if (progress < phases.raise + phases.slam) {
+                // Slam staff down to ground
+                const phaseProgress = (progress - phases.raise) / phases.slam;
+                const startRotation = -Math.PI * 0.6;
+                const endRotation = Math.PI * 0.5; // 90 degrees down
+                return startRotation + (endRotation - startRotation) * phaseProgress;
+            } else if (progress < phases.raise + phases.slam + phases.hold) {
+                // Hold staff down (dramatic pause)
+                return Math.PI * 0.5; // 90 degrees down
+            } else {
+                // Return to normal position
+                const phaseProgress = (progress - phases.raise - phases.slam - phases.hold) / phases.return;
+                const startRotation = Math.PI * 0.5;
+                return startRotation * (1 - phaseProgress);
+            }
+        }
         
-        return rotation;
+        return 0;
     }
 
     getCastPose(playerId) {

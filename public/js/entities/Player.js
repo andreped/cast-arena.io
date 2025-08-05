@@ -29,6 +29,9 @@ export class Player {
         // Track recent mana pickups for UI display
         this.recentManaPickups = data.recentManaPickups || [];
         
+        // Ring of Fire inventory
+        this.ringOfFireCharges = data.ringOfFireCharges || 0;
+        
         // Smooth movement system - velocity and acceleration
         this.velocityX = data.velocityX || 0;
         this.velocityY = data.velocityY || 0;
@@ -193,5 +196,23 @@ export class Player {
     getTotalRecentMana() {
         this.cleanupExpiredManaPickups();
         return this.recentManaPickups.reduce((total, pickup) => total + pickup.amount, 0);
+    }
+    
+    // Ring of Fire methods
+    addRingOfFireCharge() {
+        this.ringOfFireCharges++;
+    }
+    
+    useRingOfFire() {
+        if (this.ringOfFireCharges > 0 && this.mana >= 25) {
+            this.ringOfFireCharges--;
+            this.mana -= 25;
+            return true;
+        }
+        return false;
+    }
+    
+    hasRingOfFire() {
+        return this.ringOfFireCharges > 0;
     }
 }
