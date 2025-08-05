@@ -336,79 +336,101 @@ export class InputSystem {
         const player = this.game.players.get(this.game.myId);
         if (!player || player.isRespawning) return;
 
+        // Collect input state
+        let inputX = 0;
+        let inputY = 0;
         let moved = false;
-        let newX = player.x;
-        let newY = player.y;
-        
-        // Frame-rate independent movement (speed is pixels per second)
-        // Convert deltaTime from milliseconds to seconds and apply to speed
-        const effectiveSpeed = player.getEffectiveSpeed() * (deltaTime / 1000);
 
+        // Keyboard input
         if (this.keys.w || this.keys.ArrowUp) {
-            newY -= effectiveSpeed;
+            inputY -= 1;
             moved = true;
         }
         if (this.keys.s || this.keys.ArrowDown) {
-            newY += effectiveSpeed;
+            inputY += 1;
             moved = true;
         }
         if (this.keys.a || this.keys.ArrowLeft) {
-            newX -= effectiveSpeed;
+            inputX -= 1;
             moved = true;
             if (player.setFacing(-1)) moved = true;
         }
         if (this.keys.d || this.keys.ArrowRight) {
-            newX += effectiveSpeed;
+            inputX += 1;
             moved = true;
             if (player.setFacing(1)) moved = true;
         }
 
+        // Mobile joystick input
         if (this.isMobile && this.joystickActive) {
             const moveThreshold = 0.1;
             if (Math.abs(this.joystickDirection.x) > moveThreshold || 
                 Math.abs(this.joystickDirection.y) > moveThreshold) {
-                newX += this.joystickDirection.x * effectiveSpeed * 1.5;
-                newY += this.joystickDirection.y * effectiveSpeed * 1.5;
+                inputX = this.joystickDirection.x * 1.5; // Slightly stronger joystick input
+                inputY = this.joystickDirection.y * 1.5;
                 moved = true;
             }
         }
 
-        if (moved) {
-            // Client-side prediction with reconciliation
+        // Normalize diagonal movement (prevent faster diagonal speed)
+        if (inputX !== 0 && inputY !== 0) {
+            const length = Math.sqrt(inputX * inputX + inputY * inputY);
+            inputX /= length;
+            inputY /= length;
+        }
+
+        // Always update velocity (even if no input, for deceleration)
+        const newPosition = player.updateVelocity(inputX, inputY, deltaTime);
+        let finalX = player.x;
+        let finalY = player.y;
+
+        // Only check for movement if velocity is significant
+        const velocityThreshold = 0.1;
+        const isMovingX = Math.abs(player.velocityX) > velocityThreshold;
+        const isMovingY = Math.abs(player.velocityY) > velocityThreshold;
+
+        if (isMovingX || isMovingY) {
+            // Client-side prediction with collision detection
             const playerRadius = GAME_CONFIG.player.size;
-            let finalX = player.x;
-            let finalY = player.y;
             
-            // First, try the full movement (client prediction)
-            if (!this.game.checkWallCollision(newX, newY, playerRadius)) {
-                // No collision - apply full movement
-                finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newX));
-                finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newY));
+            // Try the full movement first
+            if (!this.game.checkWallCollision(newPosition.x, newPosition.y, playerRadius)) {
+                // No collision - apply full movement with world boundaries
+                finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newPosition.x));
+                finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newPosition.y));
             } else {
-                // Collision detected - try sliding
+                // Collision detected - try sliding along walls
                 let didSlide = false;
+                let slideX = player.x;
+                let slideY = player.y;
                 
                 // Try horizontal movement only
-                if (newX !== player.x && !this.game.checkWallCollision(newX, player.y, playerRadius)) {
-                    finalX = newX;
+                if (isMovingX && !this.game.checkWallCollision(newPosition.x, player.y, playerRadius)) {
+                    slideX = newPosition.x;
                     didSlide = true;
+                } else if (isMovingX) {
+                    // Hit wall horizontally - stop horizontal velocity
+                    player.velocityX = 0;
                 }
                 
                 // Try vertical movement only
-                if (newY !== player.y && !this.game.checkWallCollision(player.x, newY, playerRadius)) {
-                    finalY = newY;
+                if (isMovingY && !this.game.checkWallCollision(player.x, newPosition.y, playerRadius)) {
+                    slideY = newPosition.y;
                     didSlide = true;
+                } else if (isMovingY) {
+                    // Hit wall vertically - stop vertical velocity
+                    player.velocityY = 0;
                 }
                 
                 if (didSlide) {
-                    // Apply world boundaries
-                    finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, finalX));
-                    finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, finalY));
+                    // Apply world boundaries to sliding movement
+                    finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, slideX));
+                    finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, slideY));
                 }
             }
             
             // Only update if position actually changed
-            if (finalX !== player.x || finalY !== player.y) {
+            if (Math.abs(finalX - player.x) > 0.01 || Math.abs(finalY - player.y) > 0.01) {
                 // Store input for potential reconciliation
                 this.inputSequence++;
                 this.debugStats.totalInputs++;
@@ -417,8 +439,8 @@ export class InputSystem {
                     timestamp: performance.now(),
                     x: finalX,
                     y: finalY,
-                    inputX: newX,
-                    inputY: newY
+                    inputX: newPosition.x,
+                    inputY: newPosition.y
                 };
                 
                 this.pendingInputs.set(this.inputSequence, inputData);
