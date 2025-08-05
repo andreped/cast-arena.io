@@ -28,6 +28,14 @@ export class Player {
         
         // Track recent mana pickups for UI display
         this.recentManaPickups = data.recentManaPickups || [];
+        
+        // Smooth movement system - velocity and acceleration
+        this.velocityX = data.velocityX || 0;
+        this.velocityY = data.velocityY || 0;
+        this.maxVelocity = this.getEffectiveSpeed();
+        this.acceleration = data.acceleration || GAME_CONFIG.player.acceleration || 800; // pixels per second²
+        this.deceleration = data.deceleration || GAME_CONFIG.player.deceleration || 1200; // pixels per second²
+        this.airResistance = data.airResistance || GAME_CONFIG.player.airResistance || 0.85; // friction when no input
     }
 
     update(data) {
@@ -39,6 +47,93 @@ export class Player {
                          Math.min(GAME_CONFIG.world.width - GAME_CONFIG.player.size, x));
         this.y = Math.max(GAME_CONFIG.player.size, 
                          Math.min(GAME_CONFIG.world.height - GAME_CONFIG.player.size, y));
+    }
+
+    // New smooth movement system
+    updateVelocity(inputX, inputY, deltaTime) {
+        const deltaSeconds = deltaTime / 1000;
+        this.maxVelocity = this.getEffectiveSpeed();
+        
+        // Calculate target velocity based on input
+        const targetVelX = inputX * this.maxVelocity;
+        const targetVelY = inputY * this.maxVelocity;
+        
+        // Apply acceleration towards target velocity
+        if (inputX !== 0) {
+            // Player is actively moving horizontally
+            const velDiffX = targetVelX - this.velocityX;
+            const accelX = Math.sign(velDiffX) * this.acceleration * deltaSeconds;
+            
+            if (Math.abs(accelX) >= Math.abs(velDiffX)) {
+                this.velocityX = targetVelX;
+            } else {
+                this.velocityX += accelX;
+            }
+        } else {
+            // No horizontal input - apply deceleration
+            if (Math.abs(this.velocityX) > 0.1) {
+                const decelX = Math.sign(this.velocityX) * this.deceleration * deltaSeconds;
+                if (Math.abs(decelX) >= Math.abs(this.velocityX)) {
+                    this.velocityX = 0;
+                } else {
+                    this.velocityX -= decelX;
+                }
+            } else {
+                this.velocityX = 0;
+            }
+        }
+        
+        if (inputY !== 0) {
+            // Player is actively moving vertically
+            const velDiffY = targetVelY - this.velocityY;
+            const accelY = Math.sign(velDiffY) * this.acceleration * deltaSeconds;
+            
+            if (Math.abs(accelY) >= Math.abs(velDiffY)) {
+                this.velocityY = targetVelY;
+            } else {
+                this.velocityY += accelY;
+            }
+        } else {
+            // No vertical input - apply deceleration
+            if (Math.abs(this.velocityY) > 0.1) {
+                const decelY = Math.sign(this.velocityY) * this.deceleration * deltaSeconds;
+                if (Math.abs(decelY) >= Math.abs(this.velocityY)) {
+                    this.velocityY = 0;
+                } else {
+                    this.velocityY -= decelY;
+                }
+            } else {
+                this.velocityY = 0;
+            }
+        }
+        
+        // Cap velocity to max speed
+        const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+        if (currentSpeed > this.maxVelocity) {
+            const scale = this.maxVelocity / currentSpeed;
+            this.velocityX *= scale;
+            this.velocityY *= scale;
+        }
+        
+        // Calculate new position
+        const newX = this.x + this.velocityX * deltaSeconds;
+        const newY = this.y + this.velocityY * deltaSeconds;
+        
+        return { x: newX, y: newY };
+    }
+
+    // Handle collision by adjusting velocity
+    handleCollision(newX, newY, originalX, originalY) {
+        // If we hit a wall, we need to adjust our velocity accordingly
+        const hitWallX = newX !== originalX && newX === this.x;
+        const hitWallY = newY !== originalY && newY === this.y;
+        
+        if (hitWallX) {
+            this.velocityX = 0;
+        }
+        if (hitWallY) {
+            this.velocityY = 0;
+        }
     }
 
     getEffectiveSpeed() {

@@ -24,6 +24,10 @@ class Player {
         this.currentSpeedMultiplier = 1.0;
         this.lastBroadcastMana = gameConfig.player.maxMana; // Track last broadcasted mana value
         this.manaChanged = false; // Flag for optimization
+        
+        // Smooth movement system properties (mainly for client-server sync)
+        this.velocityX = 0;
+        this.velocityY = 0;
     }
 
     getRandomColor() {

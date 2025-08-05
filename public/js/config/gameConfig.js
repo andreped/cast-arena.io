@@ -12,7 +12,11 @@ export const GAME_CONFIG = {
         speed: 180, // pixels per second (was 3 pixels per frame * 60 FPS)
         size: 20,
         maxHealth: 100,
-        maxMana: 50
+        maxMana: 50,
+        // Smooth movement physics
+        acceleration: 800, // pixels per second² - how fast player accelerates
+        deceleration: 1200, // pixels per second² - how fast player stops when no input
+        airResistance: 0.85 // friction factor when coasting (not used for now but available)
     },
     spell: {
         size: 8,

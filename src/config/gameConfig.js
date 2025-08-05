@@ -8,7 +8,11 @@ const gameConfig = {
         maxMana: 50,
         manaRegenRate: 2, // mana per second
         spawnProtectionDuration: 2000,
-        respawnDelay: 3000
+        respawnDelay: 3000,
+        // Smooth movement physics (for reference, mainly handled client-side)
+        acceleration: 800, // pixels per second²
+        deceleration: 1200, // pixels per second²
+        airResistance: 0.85 // friction factor
     },
     spells: {
         fireball: {
