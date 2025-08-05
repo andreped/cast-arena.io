@@ -30,6 +30,7 @@ export class RenderSystem {
         this.drawItems();
         this.drawSpells();
         this.drawExplosions();
+        this.drawRingOfFireEffects();
         this.drawPlayers();
         
         this.ctx.restore();
@@ -403,6 +404,61 @@ export class RenderSystem {
             this.ctx.quadraticCurveTo(-size * 0.3, size * 0.4, -size * 0.3, size * 0.1);
             this.ctx.quadraticCurveTo(-size * 0.3, -size * 0.2, 0, -size * 0.5);
             this.ctx.fill();
+        } else if (item.type === 'ringOfFire') {
+            // Draw Ring of Fire item with fire colors and ring symbol
+            const size = item.size;
+            
+            // Animated fire glow
+            const fireIntensity = 0.8 + Math.sin(time * 4 + item.animationOffset) * 0.3;
+            
+            // Outer fire glow - orange-red
+            this.ctx.shadowColor = '#FF4500';
+            this.ctx.shadowBlur = 25;
+            this.ctx.fillStyle = `rgba(255, 69, 0, ${0.4 * fireIntensity})`;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size + 10, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Middle fire ring
+            this.ctx.shadowBlur = 15;
+            this.ctx.fillStyle = `rgba(255, 140, 0, ${0.7 * fireIntensity})`;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size * 0.8, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Inner hot core
+            this.ctx.shadowBlur = 8;
+            this.ctx.fillStyle = `rgba(255, 255, 100, ${0.9 * fireIntensity})`;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size * 0.5, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            // Draw ring symbol
+            this.ctx.shadowBlur = 0;
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Inner ring
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, size * 0.15, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Fire particles around ring
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2 + time * 2;
+                const radius = size * 0.9;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                this.ctx.fillStyle = `rgba(255, ${100 + i * 20}, 0, ${0.8 * fireIntensity})`;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, 2, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
         }
         
         this.ctx.restore();
@@ -568,6 +624,91 @@ export class RenderSystem {
             this.ctx.arc(x, y, particleSize, 0, Math.PI * 2);
             this.ctx.fill();
         }
+    }
+
+    drawRingOfFireEffects() {
+        if (!this.spriteSystem.ringOfFireEffects) return;
+        
+        this.spriteSystem.ringOfFireEffects.forEach(effect => {
+            this.drawRingOfFireEffect(effect);
+        });
+    }
+
+    drawRingOfFireEffect(effect) {
+        const currentTime = Date.now();
+        const age = currentTime - effect.startTime;
+        const progress = age / effect.duration;
+        
+        if (progress >= 1) return; // Effect finished
+        
+        this.ctx.save();
+        this.ctx.translate(effect.x, effect.y);
+        
+        // Calculate animation phases
+        let currentRadius = 0;
+        let alpha = 1;
+        
+        if (age < effect.expandTime) {
+            // Expanding phase
+            const expandProgress = age / effect.expandTime;
+            currentRadius = effect.maxRadius * expandProgress;
+            alpha = 1;
+        } else if (age < effect.expandTime + effect.holdTime) {
+            // Holding phase
+            currentRadius = effect.maxRadius;
+            alpha = 1;
+        } else {
+            // Fading phase
+            currentRadius = effect.maxRadius;
+            const fadeProgress = (age - effect.expandTime - effect.holdTime) / effect.fadeTime;
+            alpha = 1 - fadeProgress;
+        }
+        
+        this.ctx.globalAlpha = alpha;
+        
+        // Draw multiple fire rings for effect
+        const rings = 3;
+        for (let i = 0; i < rings; i++) {
+            const ringRadius = currentRadius - (i * 15);
+            if (ringRadius <= 0) continue;
+            
+            const intensity = 1 - (i / rings);
+            const flicker = Math.sin(currentTime * 0.01 + i) * 0.3 + 0.7;
+            
+            // Outer fire glow
+            this.ctx.shadowColor = '#FF4500';
+            this.ctx.shadowBlur = 20;
+            this.ctx.strokeStyle = `rgba(255, ${69 + i * 50}, 0, ${intensity * flicker * 0.8})`;
+            this.ctx.lineWidth = 8 - i * 2;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+            this.ctx.stroke();
+            
+            // Inner bright core
+            this.ctx.shadowBlur = 10;
+            this.ctx.strokeStyle = `rgba(255, ${200 + i * 25}, 100, ${intensity * flicker})`;
+            this.ctx.lineWidth = 4 - i;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+        
+        // Add fire particles around the ring
+        const particleCount = Math.floor(currentRadius / 10);
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (i / particleCount) * Math.PI * 2 + currentTime * 0.002;
+            const radius = currentRadius + Math.sin(currentTime * 0.005 + i) * 10;
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            
+            this.ctx.shadowBlur = 5;
+            this.ctx.fillStyle = `rgba(255, ${150 + Math.random() * 105}, 0, ${alpha * 0.8})`;
+            this.ctx.beginPath();
+            this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        this.ctx.restore();
     }
 
     drawPlayers() {
@@ -986,6 +1127,13 @@ export class RenderSystem {
                 
                 // Add a small blue glow effect on minimap
                 this.minimapCtx.fillStyle = 'rgba(0, 128, 255, 0.5)';
+                this.minimapCtx.fillRect(x - dotSize, y - dotSize, dotSize * 2, dotSize * 2);
+            } else if (item.type === 'ringOfFire') {
+                this.minimapCtx.fillStyle = '#FF4500'; // Orange-red for Ring of Fire items
+                this.minimapCtx.fillRect(x - dotSize/2, y - dotSize/2, dotSize, dotSize);
+                
+                // Add a small orange glow effect on minimap
+                this.minimapCtx.fillStyle = 'rgba(255, 69, 0, 0.7)';
                 this.minimapCtx.fillRect(x - dotSize, y - dotSize, dotSize * 2, dotSize * 2);
             }
         });

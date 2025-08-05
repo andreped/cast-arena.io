@@ -1,5 +1,6 @@
 const SpeedItem = require('../entities/SpeedItem');
 const ManaItem = require('../entities/ManaItem');
+const RingOfFireItem = require('../entities/RingOfFireItem');
 const gameConfig = require('../../config/gameConfig');
 
 class ItemSystem {
@@ -22,6 +23,12 @@ class ItemSystem {
                 maxItems: 4, // Rarer than speed items
                 spawnInterval: 5000, // Same spawn frequency as speed items
                 entityClass: ManaItem,
+                lastSpawnTime: 0
+            },
+            ringOfFire: {
+                maxItems: 2, // Very rare - only 2 at a time
+                spawnInterval: 10000, // Temporarily reduced to 10 seconds for testing
+                entityClass: RingOfFireItem,
                 lastSpawnTime: 0
             }
             // Future items can be added here:
@@ -152,6 +159,10 @@ class ItemSystem {
             const manaRestored = player.restoreMana(item.manaRestore);
             effectValue = manaRestored;
             console.log(`Player ${playerId} picked up mana item (+${manaRestored} mana)`);
+        } else if (item.type === 'ringOfFire') {
+            player.ringOfFireCharges++;
+            effectValue = 1;
+            console.log(`Player ${playerId} picked up Ring of Fire item (charges: ${player.ringOfFireCharges})`);
         }
 
         // Remove item from world

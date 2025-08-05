@@ -23,6 +23,7 @@ class SocketManager {
             socket.on('playerMovement', (data) => this.handlePlayerMovement(socket, data));
             socket.on('playerAiming', (data) => this.handlePlayerAiming(socket, data));
             socket.on('castSpell', (data) => this.handleSpellCast(socket, data));
+            socket.on('castRingOfFire', (data) => this.handleRingOfFireCast(socket, data));
             socket.on('spellHit', (data) => this.handleSpellHit(socket, data));
             socket.on('disconnect', () => this.handleDisconnection(socket));
         });
@@ -139,6 +140,91 @@ class SocketManager {
         
         // Send mana update after spell cast
         this.emitManaUpdate(player);
+    }
+
+    handleRingOfFireCast(socket, ringOfFireData) {
+        const player = this.gameState.getPlayer(socket.id);
+        if (!player || !player.isAlive) return;
+
+        // Check if player has Ring of Fire charges
+        if (player.ringOfFireCharges <= 0) {
+            console.log(`Player ${socket.id} tried to cast Ring of Fire without charges`);
+            return;
+        }
+
+        // Check if player has enough mana
+        if (player.mana < 25) {
+            console.log(`Player ${socket.id} tried to cast Ring of Fire without enough mana`);
+            return;
+        }
+
+        // Consume mana and charge
+        player.mana -= 25;
+        player.ringOfFireCharges--;
+
+        console.log(`Player ${socket.id} cast Ring of Fire! Charges remaining: ${player.ringOfFireCharges}`);
+
+        // Create Ring of Fire effect
+        const ringOfFire = {
+            id: `ringOfFire_${Date.now()}_${socket.id}`,
+            x: ringOfFireData.x,
+            y: ringOfFireData.y,
+            casterId: socket.id,
+            radius: 120, // Ring radius
+            damage: 80, // 80% of max health
+            createdAt: Date.now()
+        };
+
+        // Broadcast Ring of Fire cast to all players
+        this.io.emit('ringOfFireCast', ringOfFire);
+
+        // Check for damage to players within range
+        this.processRingOfFireDamage(ringOfFire);
+
+        // Send mana update after Ring of Fire cast
+        this.emitManaUpdate(player);
+    }
+
+    processRingOfFireDamage(ringOfFire) {
+        for (const [playerId, player] of this.gameState.players) {
+            // Skip dead players only - Ring of Fire affects everyone including the caster
+            if (!player.isAlive) continue;
+
+            const dx = player.x - ringOfFire.x;
+            const dy = player.y - ringOfFire.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Check if player is within Ring of Fire range
+            if (distance <= ringOfFire.radius) {
+                // Check if there's a wall between Ring of Fire center and player
+                const wallBetween = this.gameState.checkWallLineCollision(
+                    ringOfFire.x, ringOfFire.y,
+                    player.x, player.y
+                );
+
+                if (!wallBetween) {
+                    // Calculate damage (80% of current health)
+                    const damage = Math.floor(player.health * 0.8);
+                    const actualDamage = player.takeDamage(damage);
+
+                    if (actualDamage) {
+                        console.log(`Ring of Fire hit player ${playerId} for ${damage} damage`);
+                        
+                        // Send health update
+                        this.io.emit('healthUpdate', {
+                            playerId: playerId,
+                            health: player.health,
+                            maxHealth: player.maxHealth
+                        });
+
+                        // Check if player died
+                        if (player.health <= 0) {
+                            this.handlePlayerDeath(playerId, ringOfFire.casterId);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     handleSpellHit(socket, hitData) {

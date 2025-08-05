@@ -136,6 +136,12 @@ export class InputSystem {
                 this.handleSpellCast();
             }
         }
+        
+        // Handle Ring of Fire activation
+        if (e.key === '1') {
+            e.preventDefault();
+            this.handleRingOfFireCast();
+        }
     }
 
     handleKeyUp(e) {
@@ -324,6 +330,40 @@ export class InputSystem {
         // Update facing direction and send movement data (including aiming angle)
         if (player.setFacing(normalizedDx)) {
             this.game.network.sendMovement(player.getMovementData());
+        }
+    }
+
+    handleRingOfFireCast() {
+        if (!this.game.canPlay()) return;
+        
+        const player = this.game.players.get(this.game.myId);
+        if (!player || player.isRespawning || !player.isAlive) return;
+
+        // Check if player has Ring of Fire charges
+        if (!player.hasRingOfFire()) {
+            console.log('No Ring of Fire charges available!');
+            return;
+        }
+
+        // Check if player has enough mana
+        if (player.mana < 25) {
+            console.log('Not enough mana! Need 25 mana for Ring of Fire.');
+            return;
+        }
+
+        // Use Ring of Fire (will deduct mana and charge)
+        if (player.useRingOfFire()) {
+            console.log('Casting Ring of Fire!');
+            
+            // Trigger Gandalf-style casting animation
+            this.game.renderer.spriteSystem.createRingOfFireCastAnimation(this.game.myId);
+
+            // Send Ring of Fire cast to server
+            this.game.network.castRingOfFire({
+                x: player.x,
+                y: player.y,
+                playerId: this.game.myId
+            });
         }
     }
 

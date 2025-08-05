@@ -34,6 +34,7 @@ export class NetworkSystem {
         this.socket.on('itemsUpdate', this.handleItemsUpdate.bind(this));
         this.socket.on('gameStateUpdate', this.handleGameStateUpdate.bind(this));
         this.socket.on('spellExplosion', this.handleSpellExplosion.bind(this));
+        this.socket.on('ringOfFireCast', this.handleRingOfFireCast.bind(this));
         this.socket.on('manaUpdate', this.handleManaUpdate.bind(this));
         this.socket.on('serverTps', this.handleServerTps.bind(this));
         
@@ -256,6 +257,10 @@ export class NetworkSystem {
         this.socket.emit('castSpell', spellData);
     }
 
+    castRingOfFire(ringOfFireData) {
+        this.socket.emit('castRingOfFire', ringOfFireData);
+    }
+
     handleServerTps(data) {
         // Forward server TPS to input system for display
         if (this.game.inputSystem && typeof this.game.inputSystem.updateServerTps === 'function') {
@@ -274,5 +279,15 @@ export class NetworkSystem {
             const tpsEfficiency = ((data.tps / data.target) * 100).toFixed(0);
             serverTpsEl.innerHTML = `Server: <span style="color: ${tpsColor};">${data.tps} TPS</span>`;
         }
+    }
+
+    handleRingOfFireCast(data) {
+        console.log('Ring of Fire cast received:', data);
+        
+        // Create visual Ring of Fire effect
+        this.game.renderer.spriteSystem.createRingOfFireEffect(data);
+        
+        // Play Ring of Fire sound effect (if we had one)
+        // this.game.audio.playRingOfFireSound();
     }
 }
