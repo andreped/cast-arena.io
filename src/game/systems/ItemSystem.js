@@ -160,7 +160,12 @@ class ItemSystem {
             effectValue = manaRestored;
             console.log(`Player ${playerId} picked up mana item (+${manaRestored} mana)`);
         } else if (item.type === 'ringOfFire') {
-            player.ringOfFireCharges++;
+            // Ring of Fire doesn't stack - cap at 1 charge
+            if (player.ringOfFireCharges >= 1) {
+                console.log(`Player ${playerId} tried to pick up Ring of Fire but already has maximum charges (${player.ringOfFireCharges})`);
+                return; // Don't pick up the item if already at max
+            }
+            player.ringOfFireCharges = 1;
             effectValue = 1;
             console.log(`Player ${playerId} picked up Ring of Fire item (charges: ${player.ringOfFireCharges})`);
         }
