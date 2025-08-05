@@ -170,53 +170,73 @@ class SocketManager {
             x: ringOfFireData.x,
             y: ringOfFireData.y,
             casterId: socket.id,
-            radius: 120, // Ring radius
-            damage: 80, // 80% of max health
+            radius: 240, // Ring radius - doubled from 120 to 240
+            damage: 80, // Fixed 80 HP damage
             createdAt: Date.now()
         };
 
         // Broadcast Ring of Fire cast to all players
         this.io.emit('ringOfFireCast', ringOfFire);
 
-        // Check for damage to players within range
-        this.processRingOfFireDamage(ringOfFire);
+        // Start progressive damage system instead of instant damage
+        this.startRingOfFireExpansion(ringOfFire);
 
         // Send mana update after Ring of Fire cast
         this.emitManaUpdate(player);
     }
 
-    processRingOfFireDamage(ringOfFire) {
-        for (const [playerId, player] of this.gameState.players) {
-            // Skip dead players only - Ring of Fire affects everyone including the caster
-            if (!player.isAlive) continue;
-
-            const dx = player.x - ringOfFire.x;
-            const dy = player.y - ringOfFire.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            // Check if player is within Ring of Fire range
-            if (distance <= ringOfFire.radius) {
-                // Check if there's a wall between Ring of Fire center and player
-                const wallBetween = this.gameState.checkWallLineCollision(
-                    ringOfFire.x, ringOfFire.y,
-                    player.x, player.y
-                );
-
-                if (!wallBetween) {
-                    // Calculate damage (80% of current health)
-                    const damage = Math.floor(player.health * 0.8);
+    startRingOfFireExpansion(ringOfFire) {
+        const expandDuration = 800; // Ring expands for 800ms to match client animation
+        const startTime = Date.now();
+        const damageInterval = 50; // Check for damage every 50ms for smooth progression
+        const playersHit = new Set(); // Track which players have already been hit
+        
+        const expansionInterval = setInterval(() => {
+            const currentTime = Date.now();
+            const elapsed = currentTime - startTime;
+            
+            // Calculate current radius of the expanding ring
+            const progress = Math.min(elapsed / expandDuration, 1);
+            const currentRadius = ringOfFire.radius * progress;
+            
+            // Check all players for damage
+            for (const [playerId, player] of this.gameState.players) {
+                // Skip if already hit, caster, or dead
+                if (playersHit.has(playerId) || playerId === ringOfFire.casterId || !player.isAlive) {
+                    continue;
+                }
+                
+                const dx = player.x - ringOfFire.x;
+                const dy = player.y - ringOfFire.y;
+                const playerDistance = Math.sqrt(dx * dx + dy * dy);
+                
+                // If the expanding ring has reached this player's position
+                if (playerDistance <= currentRadius) {
+                    // Enhanced wall collision check for Ring of Fire expansion
+                    const isProtected = this.isPlayerProtectedByWalls(ringOfFire.x, ringOfFire.y, player.x, player.y, currentRadius);
+                    
+                    console.log(`Ring of Fire check: Player ${playerId} at distance ${playerDistance.toFixed(1)}px, protected: ${isProtected}`);
+                    
+                    if (isProtected) {
+                        console.log(`Player ${playerId} is protected by walls - no damage`);
+                        continue; // Player is protected by walls
+                    }
+                    
+                    // Apply damage
+                    const damage = 80;
                     const actualDamage = player.takeDamage(damage);
-
+                    
                     if (actualDamage) {
-                        console.log(`Ring of Fire hit player ${playerId} for ${damage} damage`);
+                        playersHit.add(playerId); // Mark as hit to prevent multiple hits
+                        console.log(`Ring of Fire expansion hit player ${playerId} at distance ${playerDistance.toFixed(1)}px for ${damage} damage`);
                         
-                        // Send health update
+                        // Send health update using consistent format
                         this.io.emit('healthUpdate', {
-                            playerId: playerId,
+                            id: playerId,
                             health: player.health,
                             maxHealth: player.maxHealth
                         });
-
+                        
                         // Check if player died
                         if (player.health <= 0) {
                             this.handlePlayerDeath(playerId, ringOfFire.casterId);
@@ -224,7 +244,54 @@ class SocketManager {
                     }
                 }
             }
+            
+            // Stop checking when expansion is complete
+            if (progress >= 1) {
+                clearInterval(expansionInterval);
+                console.log(`Ring of Fire expansion complete. Hit ${playersHit.size} players.`);
+            }
+        }, damageInterval);
+    }
+
+    // Enhanced wall collision detection for Ring of Fire expansion
+    isPlayerProtectedByWalls(ringCenterX, ringCenterY, playerX, playerY, currentRadius) {
+        // First check: Direct line of sight from ring center to player center
+        if (this.gameState.checkWallLineCollision(ringCenterX, ringCenterY, playerX, playerY)) {
+            console.log(`Player protected: Direct line blocked from ring center to player`);
+            return true; // Direct line blocked, player is protected
         }
+
+        // Second check: Check if the ring expansion wave can reach the player
+        // by checking multiple points around the player's collision area
+        const playerRadius = 20; // Player collision radius
+        const checkPoints = [
+            // Cardinal directions
+            { x: playerX, y: playerY - playerRadius }, // North
+            { x: playerX + playerRadius, y: playerY }, // East
+            { x: playerX, y: playerY + playerRadius }, // South
+            { x: playerX - playerRadius, y: playerY }, // West
+            // Diagonal directions
+            { x: playerX + playerRadius * 0.7, y: playerY - playerRadius * 0.7 }, // NE
+            { x: playerX + playerRadius * 0.7, y: playerY + playerRadius * 0.7 }, // SE
+            { x: playerX - playerRadius * 0.7, y: playerY + playerRadius * 0.7 }, // SW
+            { x: playerX - playerRadius * 0.7, y: playerY - playerRadius * 0.7 }  // NW
+        ];
+
+        let blockedPaths = 0;
+        for (const point of checkPoints) {
+            if (this.gameState.checkWallLineCollision(ringCenterX, ringCenterY, point.x, point.y)) {
+                blockedPaths++;
+            }
+        }
+
+        // If most paths (more than 6 out of 8) are blocked, consider the player protected
+        const isProtected = blockedPaths >= 6;
+        
+        if (isProtected) {
+            console.log(`Player protected: ${blockedPaths}/8 paths blocked by walls`);
+        }
+        
+        return isProtected;
     }
 
     handleSpellHit(socket, hitData) {
