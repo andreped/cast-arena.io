@@ -249,7 +249,10 @@ class SocketManager {
                         
                         // Check if player died
                         if (player.health <= 0) {
-                            this.handlePlayerDeath(playerId, ringOfFire.casterId);
+                            const caster = this.gameState.getPlayer(ringOfFire.casterId);
+                            if (caster) {
+                                this.handlePlayerDeath(player, caster);
+                            }
                         }
                     }
                 }

@@ -12,6 +12,8 @@ export class UISystem {
         this.createDeathModal();
         this.createEffectsDisplay();
         this.initPlayerStatsUI();
+        this.initAudioControls();
+        this.initModalAudioControls();
         if (this.game.input.isMobile) {
             this.createMobileControls();
         }
@@ -24,6 +26,18 @@ export class UISystem {
             }
         };
         document.addEventListener('keydown', this.boundKeyHandler);
+        
+        // Setup tab switching
+        const leaderboardTab = document.getElementById('leaderboardTab');
+        const settingsTab = document.getElementById('settingsTab');
+        
+        if (leaderboardTab) {
+            leaderboardTab.addEventListener('click', () => this.switchTab('leaderboard'));
+        }
+        
+        if (settingsTab) {
+            settingsTab.addEventListener('click', () => this.switchTab('settings'));
+        }
     }
 
     // Add cleanup method
@@ -430,7 +444,31 @@ export class UISystem {
         const modal = document.getElementById('leaderboardModal');
         modal.style.display = this.showLeaderboard ? 'block' : 'none';
         if (this.showLeaderboard) {
+            // Always show leaderboard tab by default
+            this.switchTab('leaderboard');
             this.updateLeaderboard();
+        }
+    }
+    
+    switchTab(tabName) {
+        // Update tab buttons
+        const leaderboardTab = document.getElementById('leaderboardTab');
+        const settingsTab = document.getElementById('settingsTab');
+        
+        // Update tab panels
+        const leaderboardPanel = document.getElementById('leaderboardPanel');
+        const settingsPanel = document.getElementById('settingsPanel');
+        
+        if (tabName === 'leaderboard') {
+            leaderboardTab?.classList.add('active');
+            settingsTab?.classList.remove('active');
+            leaderboardPanel?.classList.add('active');
+            settingsPanel?.classList.remove('active');
+        } else if (tabName === 'settings') {
+            leaderboardTab?.classList.remove('active');
+            settingsTab?.classList.add('active');
+            leaderboardPanel?.classList.remove('active');
+            settingsPanel?.classList.add('active');
         }
     }
 
@@ -561,5 +599,146 @@ export class UISystem {
         } else {
             effectsDiv.style.display = 'none';
         }
+    }
+
+    initAudioControls() {
+        // Set up audio control panel toggle
+        const toggleButton = document.getElementById('toggleAudioPanel');
+        const panelContent = document.getElementById('audioPanelContent');
+        
+        if (toggleButton && panelContent) {
+            toggleButton.addEventListener('click', () => {
+                const isHidden = panelContent.style.display === 'none';
+                panelContent.style.display = isHidden ? 'block' : 'none';
+                toggleButton.textContent = isHidden ? '▼' : '▶';
+            });
+        }
+        
+        // Set up volume sliders
+        const volumeMaster = document.getElementById('volumeMaster');
+        const volumeMusic = document.getElementById('volumeMusic');
+        const volumeSfx = document.getElementById('volumeSfx');
+        
+        if (this.game.audio) {
+            // Initialize slider values from audio system
+            if (volumeMaster) {
+                volumeMaster.value = this.game.audio.getVolume('master') * 100;
+                volumeMaster.addEventListener('input', (e) => {
+                    this.game.audio.setVolume('master', e.target.value / 100);
+                });
+            }
+            
+            if (volumeMusic) {
+                volumeMusic.value = this.game.audio.getVolume('music') * 100;
+                volumeMusic.addEventListener('input', (e) => {
+                    this.game.audio.setVolume('music', e.target.value / 100);
+                });
+            }
+            
+            if (volumeSfx) {
+                volumeSfx.value = this.game.audio.getVolume('sfx') * 100;
+                volumeSfx.addEventListener('input', (e) => {
+                    this.game.audio.setVolume('sfx', e.target.value / 100);
+                });
+            }
+            
+            // Set up mute buttons
+            const muteMaster = document.getElementById('muteMaster');
+            const muteMusic = document.getElementById('muteMusic');
+            const muteSfx = document.getElementById('muteSfx');
+            
+            const updateMuteButton = (button, category) => {
+                const isMuted = this.game.audio.isMuted(category);
+                button.textContent = isMuted ? '🔇' : '🔊';
+                button.style.borderColor = isMuted ? '#ff4444' : '#666';
+            };
+            
+            if (muteMaster) {
+                updateMuteButton(muteMaster, 'master');
+                muteMaster.addEventListener('click', () => {
+                    this.game.audio.toggleMute('master');
+                    updateMuteButton(muteMaster, 'master');
+                });
+            }
+            
+            if (muteMusic) {
+                updateMuteButton(muteMusic, 'music');
+                muteMusic.addEventListener('click', () => {
+                    this.game.audio.toggleMute('music');
+                    updateMuteButton(muteMusic, 'music');
+                });
+            }
+            
+            if (muteSfx) {
+                updateMuteButton(muteSfx, 'sfx');
+                muteSfx.addEventListener('click', () => {
+                    this.game.audio.toggleMute('sfx');
+                    updateMuteButton(muteSfx, 'sfx');
+                });
+            }
+        }
+    }
+    
+    initModalAudioControls() {
+        if (!this.game.audio) return;
+        
+        // Set up volume sliders in modal
+        const volumeMasterModal = document.getElementById('volumeMasterModal');
+        const volumeMusicModal = document.getElementById('volumeMusicModal');
+        const volumeSfxModal = document.getElementById('volumeSfxModal');
+        
+        // Set up value displays
+        const volumeMasterValue = document.getElementById('volumeMasterValue');
+        const volumeMusicValue = document.getElementById('volumeMusicValue');
+        const volumeSfxValue = document.getElementById('volumeSfxValue');
+        
+        const setupVolumeControl = (slider, valueDisplay, category) => {
+            if (!slider) return;
+            
+            // Initialize from audio system
+            const volume = this.game.audio.getVolume(category);
+            slider.value = volume * 100;
+            if (valueDisplay) {
+                valueDisplay.textContent = Math.round(volume * 100) + '%';
+            }
+            
+            // Update on slider change
+            slider.addEventListener('input', (e) => {
+                const value = e.target.value / 100;
+                this.game.audio.setVolume(category, value);
+                if (valueDisplay) {
+                    valueDisplay.textContent = Math.round(value * 100) + '%';
+                }
+            });
+        };
+        
+        setupVolumeControl(volumeMasterModal, volumeMasterValue, 'master');
+        setupVolumeControl(volumeMusicModal, volumeMusicValue, 'music');
+        setupVolumeControl(volumeSfxModal, volumeSfxValue, 'sfx');
+        
+        // Set up mute buttons
+        const muteMasterModal = document.getElementById('muteMasterModal');
+        const muteMusicModal = document.getElementById('muteMusicModal');
+        const muteSfxModal = document.getElementById('muteSfxModal');
+        
+        const setupMuteButton = (button, category) => {
+            if (!button) return;
+            
+            const updateButton = () => {
+                const isMuted = this.game.audio.isMuted(category);
+                button.textContent = isMuted ? '🔇' : '🔊';
+                button.classList.toggle('muted', isMuted);
+            };
+            
+            updateButton();
+            button.addEventListener('click', () => {
+                this.game.audio.toggleMute(category);
+                updateButton();
+            });
+        };
+        
+        setupMuteButton(muteMasterModal, 'master');
+        setupMuteButton(muteMusicModal, 'music');
+        setupMuteButton(muteSfxModal, 'sfx');
     }
 }
