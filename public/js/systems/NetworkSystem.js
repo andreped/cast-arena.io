@@ -111,7 +111,7 @@ export class NetworkSystem {
     handlePlayerMoved(data) {
         // Handle server reconciliation for local player
         if (data.id === this.game.myId) {
-            this.game.inputSystem.handleServerReconciliation(data);
+            this.game.input.handleServerReconciliation(data);
             return;
         }
         
@@ -322,11 +322,11 @@ export class NetworkSystem {
 
     handleServerTps(data) {
         // Forward server TPS to input system for display
-        if (this.game.inputSystem && typeof this.game.inputSystem.updateServerTps === 'function') {
-            this.game.inputSystem.updateServerTps(data.tps);
+        if (this.game.input && typeof this.game.input.updateServerTps === 'function') {
+            this.game.input.updateServerTps(data.tps);
             // Update target TPS if provided
             if (data.target !== undefined) {
-                this.game.inputSystem.targetTps = data.target;
+                this.game.input.targetTps = data.target;
             }
         }
         
