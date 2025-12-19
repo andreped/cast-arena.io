@@ -582,18 +582,20 @@ export class InputSystem {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
         }
 
-        // Dynamic threshold based on player speed to handle speed boosts better
-        const baseThreshold = 2.0; // Increased from 0.5 to be less strict for normal movement
-        const speedMultiplier = playerSpeedMultiplier; // Use the same variable
+        // Latency-adaptive threshold - higher latency = more lenient threshold
+        // This prevents jitter on high-latency connections (like Render free tier)
+        const baseThreshold = 2.0;
+        const latencyFactor = Math.max(1.0, latency / 50); // Scale based on latency (50ms baseline)
+        const speedMultiplier = playerSpeedMultiplier;
         
         // For speed-boosted players, be much more lenient with position differences
         let reconciliationThreshold;
         if (speedMultiplier > 1.2) {
             // Much higher threshold for speed-boosted players to prevent constant corrections
-            reconciliationThreshold = baseThreshold * speedMultiplier * 3.0; // 3x more lenient
+            reconciliationThreshold = baseThreshold * speedMultiplier * 3.0 * latencyFactor;
         } else {
-            // More reasonable threshold for normal players
-            reconciliationThreshold = baseThreshold * Math.max(1.0, speedMultiplier);
+            // Adapt threshold based on latency for normal players
+            reconciliationThreshold = baseThreshold * Math.max(1.0, speedMultiplier) * latencyFactor;
         }
         
         if (totalDelta > reconciliationThreshold) {
