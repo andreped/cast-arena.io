@@ -28,6 +28,10 @@ export class InputSystem {
         this.lastServerUpdate = 0;
         this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
         
+        // Network send throttling - critical for high-latency connections
+        this.lastNetworkSend = 0;
+        this.networkSendInterval = 50; // Send position updates every 50ms max (~20 updates/sec)
+        
         // Advanced smoothing system for jitter reduction
         this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
         this.maxSnapThreshold = 15; // If debt exceeds this, snap immediately (prevents rubber-banding)
@@ -493,41 +497,48 @@ export class InputSystem {
             
             // Only update if position actually changed
             if (Math.abs(finalX - player.x) > 0.01 || Math.abs(finalY - player.y) > 0.01) {
-                // Store input for potential reconciliation
-                this.inputSequence++;
-                this.debugStats.totalInputs++;
-                
-                const inputData = {
-                    timestamp: performance.now(),
-                    x: finalX,
-                    y: finalY,
-                    inputX: newPosition.x,
-                    inputY: newPosition.y
-                };
-                
-                this.pendingInputs.set(this.inputSequence, inputData);
-                
-                // Debug logging
-                if (this.debugMode) {
-                    this.addDebugLog(`INPUT #${this.inputSequence}: (${finalX.toFixed(1)}, ${finalY.toFixed(1)}) - Pending: ${this.pendingInputs.size}`);
-                }
-                
-                // Clean old pending inputs (older than 1 second)
-                const now = performance.now();
-                for (const [seq, input] of this.pendingInputs) {
-                    if (now - input.timestamp > 1000) {
-                        this.pendingInputs.delete(seq);
-                    }
-                }
-                
-                // Apply movement immediately (client prediction)
+                // Apply movement immediately (client prediction - always smooth)
                 player.move(finalX, finalY);
                 
-                // Send to server with sequence number
-                const movementData = player.getMovementData();
-                movementData.sequence = this.inputSequence;
-                this.debugStats.networkUpdates++;
-                this.game.network.sendMovement(movementData);
+                // Throttle network sends to prevent overwhelming the server
+                const now = performance.now();
+                const shouldSendToServer = (now - this.lastNetworkSend) >= this.networkSendInterval;
+                
+                if (shouldSendToServer) {
+                    // Store input for reconciliation
+                    this.inputSequence++;
+                    this.debugStats.totalInputs++;
+                    
+                    const inputData = {
+                        timestamp: now,
+                        x: finalX,
+                        y: finalY,
+                        inputX: newPosition.x,
+                        inputY: newPosition.y
+                    };
+                    
+                    this.pendingInputs.set(this.inputSequence, inputData);
+                    
+                    // Debug logging
+                    if (this.debugMode) {
+                        this.addDebugLog(`INPUT #${this.inputSequence}: (${finalX.toFixed(1)}, ${finalY.toFixed(1)}) - Pending: ${this.pendingInputs.size}`);
+                    }
+                    
+                    // Clean old pending inputs (older than 1 second)
+                    for (const [seq, input] of this.pendingInputs) {
+                        if (now - input.timestamp > 1000) {
+                            this.pendingInputs.delete(seq);
+                        }
+                    }
+                    
+                    // Send to server with sequence number
+                    const movementData = player.getMovementData();
+                    movementData.sequence = this.inputSequence;
+                    this.debugStats.networkUpdates++;
+                    this.game.network.sendMovement(movementData);
+                    
+                    this.lastNetworkSend = now;
+                }
             }
         }
     }
