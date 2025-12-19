@@ -160,6 +160,8 @@ export class Player {
         return {
             x: this.x,
             y: this.y,
+            velocityX: this.velocityX,
+            velocityY: this.velocityY,
             facingLeft: this.facingLeft,
             aimingAngle: this.aimingAngle
         };

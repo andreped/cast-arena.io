@@ -26,7 +26,11 @@ export class InputSystem {
         this.inputSequence = 0;
         this.pendingInputs = new Map(); // Store pending inputs for reconciliation
         this.lastServerUpdate = 0;
-        this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
+        this.reconciliationThreshold = 5; // Base threshold in pixels - will scale with latency
+        
+        // Network send throttling - critical for high-latency connections
+        this.lastNetworkSend = 0;
+        this.networkSendInterval = 30; // Send position updates every 30ms (~33 updates/sec) - optimized for Render
         
         // Advanced smoothing system for jitter reduction
         this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
@@ -493,41 +497,50 @@ export class InputSystem {
             
             // Only update if position actually changed
             if (Math.abs(finalX - player.x) > 0.01 || Math.abs(finalY - player.y) > 0.01) {
-                // Store input for potential reconciliation
-                this.inputSequence++;
-                this.debugStats.totalInputs++;
-                
-                const inputData = {
-                    timestamp: performance.now(),
-                    x: finalX,
-                    y: finalY,
-                    inputX: newPosition.x,
-                    inputY: newPosition.y
-                };
-                
-                this.pendingInputs.set(this.inputSequence, inputData);
-                
-                // Debug logging
-                if (this.debugMode) {
-                    this.addDebugLog(`INPUT #${this.inputSequence}: (${finalX.toFixed(1)}, ${finalY.toFixed(1)}) - Pending: ${this.pendingInputs.size}`);
-                }
-                
-                // Clean old pending inputs (older than 1 second)
-                const now = performance.now();
-                for (const [seq, input] of this.pendingInputs) {
-                    if (now - input.timestamp > 1000) {
-                        this.pendingInputs.delete(seq);
-                    }
-                }
-                
-                // Apply movement immediately (client prediction)
+                // Apply movement immediately (client prediction - always smooth)
                 player.move(finalX, finalY);
                 
-                // Send to server with sequence number
-                const movementData = player.getMovementData();
-                movementData.sequence = this.inputSequence;
-                this.debugStats.networkUpdates++;
-                this.game.network.sendMovement(movementData);
+                // Throttle network sends to prevent overwhelming the server
+                const now = performance.now();
+                const shouldSendToServer = (now - this.lastNetworkSend) >= this.networkSendInterval;
+                
+                if (shouldSendToServer) {
+                    // Store input for reconciliation
+                    this.inputSequence++;
+                    this.debugStats.totalInputs++;
+                    
+                    const inputData = {
+                        timestamp: now,
+                        x: finalX,
+                        y: finalY,
+                        velocityX: player.velocityX,
+                        velocityY: player.velocityY,
+                        inputX: newPosition.x,
+                        inputY: newPosition.y
+                    };
+                    
+                    this.pendingInputs.set(this.inputSequence, inputData);
+                    
+                    // Debug logging
+                    if (this.debugMode) {
+                        this.addDebugLog(`INPUT #${this.inputSequence}: (${finalX.toFixed(1)}, ${finalY.toFixed(1)}) - Pending: ${this.pendingInputs.size}`);
+                    }
+                    
+                    // Clean old pending inputs (older than 1 second)
+                    for (const [seq, input] of this.pendingInputs) {
+                        if (now - input.timestamp > 1000) {
+                            this.pendingInputs.delete(seq);
+                        }
+                    }
+                    
+                    // Send to server with sequence number
+                    const movementData = player.getMovementData();
+                    movementData.sequence = this.inputSequence;
+                    this.debugStats.networkUpdates++;
+                    this.game.network.sendMovement(movementData);
+                    
+                    this.lastNetworkSend = now;
+                }
             }
         }
     }
@@ -567,9 +580,13 @@ export class InputSystem {
             this.lastReconciliationTime = now;
         }
 
-        // Calculate difference between client prediction and server position
-        const deltaX = serverData.x - player.x;
-        const deltaY = serverData.y - player.y;
+        // Calculate difference between server position and CLIENT POSITION AT THAT SEQUENCE
+        // Don't compare with current position - that's moved forward during network latency!
+        const clientXAtSequence = pendingInput.x;
+        const clientYAtSequence = pendingInput.y;
+        
+        const deltaX = serverData.x - clientXAtSequence;
+        const deltaY = serverData.y - clientYAtSequence;
         const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
         // Track largest delta for debugging
@@ -577,45 +594,41 @@ export class InputSystem {
             this.debugStats.largestDelta = totalDelta;
         }
 
-        // Debug logging
-        if (this.debugMode || window.location.hostname === 'localhost') {
+        // Debug logging (only in debug mode, not production)
+        if (this.debugMode) {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
         }
 
-        // Dynamic threshold based on player speed to handle speed boosts better
-        const baseThreshold = 2.0; // Increased from 0.5 to be less strict for normal movement
-        const speedMultiplier = playerSpeedMultiplier; // Use the same variable
+        // Latency-adaptive threshold
+        // With velocity-based server physics, drift should be minimal
+        const baseThreshold = 5.0; // Slightly higher for network jitter tolerance
+        const latencyFactor = Math.max(1.0, latency / 50);
+        const speedMultiplier = playerSpeedMultiplier;
         
-        // For speed-boosted players, be much more lenient with position differences
         let reconciliationThreshold;
         if (speedMultiplier > 1.2) {
-            // Much higher threshold for speed-boosted players to prevent constant corrections
-            reconciliationThreshold = baseThreshold * speedMultiplier * 3.0; // 3x more lenient
+            reconciliationThreshold = baseThreshold * speedMultiplier * 3.0 * latencyFactor;
         } else {
-            // More reasonable threshold for normal players
-            reconciliationThreshold = baseThreshold * Math.max(1.0, speedMultiplier);
+            reconciliationThreshold = baseThreshold * Math.max(1.0, speedMultiplier) * latencyFactor;
         }
         
         if (totalDelta > reconciliationThreshold) {
-            // For speed-boosted players, use much gentler corrections
-            let correctionFactor;
-            if (speedMultiplier > 1.2) {
-                // Very gentle corrections for speed-boosted players
-                correctionFactor = 0.05 / speedMultiplier; // Even smaller corrections to reduce pushback
-                
-                // Further reduce correction if player is actively moving (to prevent pushback during movement)
-                const isMoving = this.keys.w || this.keys.a || this.keys.s || this.keys.d || 
-                               this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight ||
-                               (this.isMobile && this.joystickActive);
-                
-                if (isMoving) {
-                    correctionFactor *= 0.3; // Reduce correction by 70% when actively moving
-                }
+            // Error-magnitude adaptive correction: larger errors = gentler smoothing
+            // Small errors (< 10px): 12% per frame (~8 frames)
+            // Medium errors (10-20px): 8% per frame (~13 frames)
+            // Large errors (> 20px): 5% per frame (~20 frames)
+            let baseCorrection;
+            if (totalDelta < 10) {
+                baseCorrection = 0.12;
+            } else if (totalDelta < 20) {
+                baseCorrection = 0.08;
             } else {
-                // Reasonable correction factor for normal players
-                const baseCorrectionFactor = 0.15; // Reduced from 0.3 to be gentler
-                correctionFactor = baseCorrectionFactor / Math.max(1.0, speedMultiplier * 0.8);
+                baseCorrection = 0.05;
             }
+            
+            // Further reduce at very high latency (>100ms) to prevent oscillation
+            const latencyCorrectionFactor = latency > 100 ? 0.75 : 1.0;
+            const correctionFactor = baseCorrection * latencyCorrectionFactor;
             
             player.x += deltaX * correctionFactor;
             player.y += deltaY * correctionFactor;
@@ -623,10 +636,8 @@ export class InputSystem {
             this.debugStats.reconciliations++;
             
             if (this.debugMode) {
-                const isMoving = this.keys.w || this.keys.a || this.keys.s || this.keys.d || 
-                               this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight ||
-                               (this.isMobile && this.joystickActive);
-                this.addDebugLog(`🔧 SPEED-AWARE CORRECT: threshold=${reconciliationThreshold.toFixed(1)}px, factor=${(correctionFactor * 100).toFixed(1)}%, speed=${speedMultiplier.toFixed(1)}x, moving=${isMoving}`);
+                const frames = (1 / correctionFactor).toFixed(0);
+                this.addDebugLog(`🔧 CORRECT: Δ=${totalDelta.toFixed(1)}px, ${(correctionFactor * 100).toFixed(1)}%/frame (~${frames}f), latency=${latency.toFixed(0)}ms`);
             }
         }
 
