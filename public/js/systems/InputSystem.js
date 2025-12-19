@@ -30,7 +30,7 @@ export class InputSystem {
         
         // Network send throttling - critical for high-latency connections
         this.lastNetworkSend = 0;
-        this.networkSendInterval = 50; // Send position updates every 50ms max (~20 updates/sec)
+        this.networkSendInterval = 25; // Send position updates every 25ms (~40 updates/sec)
         
         // Advanced smoothing system for jitter reduction
         this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
