@@ -129,24 +129,30 @@ export class InputSystem {
     }
 
     handleKeyDown(e) {
-        if (this.keys.hasOwnProperty(e.key)) {
-            this.keys[e.key] = true;
-            if (e.key === ' ') {
+        // Normalize key to lowercase to handle Caps Lock
+        const key = e.key.toLowerCase();
+        
+        if (this.keys.hasOwnProperty(key)) {
+            this.keys[key] = true;
+            if (key === ' ') {
                 e.preventDefault();
                 this.handleSpellCast();
             }
         }
         
         // Handle Ring of Fire activation
-        if (e.key === '1') {
+        if (key === '1') {
             e.preventDefault();
             this.handleRingOfFireCast();
         }
     }
 
     handleKeyUp(e) {
-        if (this.keys.hasOwnProperty(e.key)) {
-            this.keys[e.key] = false;
+        // Normalize key to lowercase to handle Caps Lock
+        const key = e.key.toLowerCase();
+        
+        if (this.keys.hasOwnProperty(key)) {
+            this.keys[key] = false;
         }
     }
 
