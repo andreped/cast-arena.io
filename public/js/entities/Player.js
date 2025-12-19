@@ -143,6 +143,13 @@ export class Player {
         return GAME_CONFIG.player.speed * this.currentSpeedMultiplier;
     }
 
+    applyRecoil(angle, force) {
+        // Apply recoil force in the opposite direction of the spell
+        const recoilAngle = angle + Math.PI;
+        this.velocityX += Math.cos(recoilAngle) * force;
+        this.velocityY += Math.sin(recoilAngle) * force;
+    }
+
     setFacing(direction) {
         const oldFacing = this.facingLeft;
         this.facingLeft = direction < 0;

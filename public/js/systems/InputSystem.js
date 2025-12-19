@@ -316,6 +316,9 @@ export class InputSystem {
         // Update player's aiming angle for directional sprites
         player.aimingAngle = angle;
 
+        // Apply client-side recoil for immediate feedback
+        player.applyRecoil(angle, GAME_CONFIG.spell.recoilForce);
+
         // Trigger casting animation
         this.game.renderer.spriteSystem.createCastAnimation(this.game.myId);
 
