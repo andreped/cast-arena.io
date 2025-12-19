@@ -57,5 +57,31 @@ export const GAME_CONFIG = {
             }
         },
         seed: Math.floor(Math.random() * 1000000) // Random seed for each page load
+    },
+    audio: {
+        enabled: true,
+        sounds: {
+            // Spell sounds
+            spellCast: 'assets/sounds/sfx/fireball-cast.wav',
+            ringOfFireCast: 'assets/sounds/sfx/ring-of-fire-cast.wav',
+            spellHit: 'assets/sounds/sfx/spell-hit.wav',
+            spellExplode: 'assets/sounds/sfx/explosion.wav',
+            
+            // Player sounds
+            playerDeath: 'assets/sounds/sfx/explosion.wav', // Reuse explosion for death
+            playerRespawn: 'assets/sounds/sfx/respawn.wav',
+            
+            // Item pickup sounds
+            pickupMana: 'assets/sounds/sfx/pickup-mana.wav',
+            pickupSpeed: 'assets/sounds/sfx/pickup-speed.ogg',
+            pickupRingOfFire: 'assets/sounds/sfx/pickup-ring-of-fire.wav',
+            
+            // UI sounds
+            insufficientMana: 'assets/sounds/sfx/no-mana.wav',
+            killSound: 'assets/sounds/sfx/kill.wav'
+        },
+        music: {
+            background: 'assets/sounds/music/background.wav'
+        }
     }
 };

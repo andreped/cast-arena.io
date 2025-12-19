@@ -77,8 +77,40 @@
     <!-- Leaderboard Modal -->
     <div id="leaderboardModal" class="modal">
         <div class="modal-content">
-            <h2>🏆 Leaderboard</h2>
-            <div id="leaderboardContent"></div>
+            <div class="modal-tabs">
+                <button id="leaderboardTab" class="tab-button active">🏆 Leaderboard</button>
+                <button id="settingsTab" class="tab-button">⚙️ Settings</button>
+            </div>
+            
+            <div id="leaderboardPanel" class="tab-panel active">
+                <h2>🏆 Leaderboard</h2>
+                <div id="leaderboardContent"></div>
+            </div>
+            
+            <div id="settingsPanel" class="tab-panel">
+                <div class="settings-section">
+                    <h3>🔊 Audio Controls</h3>
+                    <div class="audio-control">
+                        <label>Master Volume</label>
+                        <button id="muteMasterModal" class="mute-btn-modal">🔊</button>
+                        <input type="range" id="volumeMasterModal" min="0" max="100" value="70" class="volume-slider">
+                        <span id="volumeMasterValue" class="volume-value">70%</span>
+                    </div>
+                    <div class="audio-control">
+                        <label>Music Volume</label>
+                        <button id="muteMusicModal" class="mute-btn-modal">🔊</button>
+                        <input type="range" id="volumeMusicModal" min="0" max="100" value="50" class="volume-slider">
+                        <span id="volumeMusicValue" class="volume-value">50%</span>
+                    </div>
+                    <div class="audio-control">
+                        <label>SFX Volume</label>
+                        <button id="muteSfxModal" class="mute-btn-modal">🔊</button>
+                        <input type="range" id="volumeSfxModal" min="0" max="100" value="80" class="volume-slider">
+                        <span id="volumeSfxValue" class="volume-value">80%</span>
+                    </div>
+                </div>
+            </div>
+            
             <p class="modal-close-hint">Press ESC to close</p>
         </div>
     </div>
@@ -96,6 +128,37 @@
         </div>
         <div id="frameTime" style="color: #ff6600; font-size: 12px; display: flex; justify-content: space-between; width: 100%;">
             <span>Frame:</span> <span>NA ms</span>
+        </div>
+    </div>
+
+    <!-- Audio Controls -->
+    <div id="audioControls" style="display: none; position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 12px; font-family: Arial, sans-serif; font-size: 13px; border-radius: 8px; z-index: 1000; width: 200px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-weight: bold;">🔊 Audio</span>
+            <button id="toggleAudioPanel" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">▼</button>
+        </div>
+        <div id="audioPanelContent">
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 11px;">Master</label>
+                    <button id="muteMaster" class="mute-btn" style="background: none; border: 1px solid #666; color: white; cursor: pointer; padding: 2px 8px; border-radius: 3px; font-size: 11px;">🔇</button>
+                </div>
+                <input type="range" id="volumeMaster" min="0" max="100" value="70" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 11px;">Music</label>
+                    <button id="muteMusic" class="mute-btn" style="background: none; border: 1px solid #666; color: white; cursor: pointer; padding: 2px 8px; border-radius: 3px; font-size: 11px;">🔇</button>
+                </div>
+                <input type="range" id="volumeMusic" min="0" max="100" value="50" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label style="font-size: 11px;">SFX</label>
+                    <button id="muteSfx" class="mute-btn" style="background: none; border: 1px solid #666; color: white; cursor: pointer; padding: 2px 8px; border-radius: 3px; font-size: 11px;">🔇</button>
+                </div>
+                <input type="range" id="volumeSfx" min="0" max="100" value="80" style="width: 100%;">
+            </div>
         </div>
     </div>
 </body>

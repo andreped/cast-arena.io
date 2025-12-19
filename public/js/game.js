@@ -8,6 +8,7 @@ import { RingOfFireItem } from './entities/RingOfFireItem.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { RenderSystem } from './systems/RenderSystem.js';
 import { NetworkSystem } from './systems/NetworkSystem.js';
+import { AudioSystem } from './systems/AudioSystem.js';
 import { UISystem } from './ui/UISystem.js';
 
 export class Game {
@@ -54,11 +55,40 @@ export class Game {
         this.network = new NetworkSystem(this);
         this.input = new InputSystem(this);
         this.renderer = new RenderSystem(this);
+        this.audio = new AudioSystem();
         this.ui = new UISystem(this);
+        
+        // Load audio assets asynchronously
+        this.initializeAudio();
         
         // Start game loop
         this.lastUpdateTime = performance.now();
         this.gameLoop();
+    }
+
+    async initializeAudio() {
+        if (!GAME_CONFIG.audio.enabled) {
+            console.log('Audio disabled in config');
+            return;
+        }
+        
+        try {
+            // Load sound effects
+            await this.audio.loadSounds(GAME_CONFIG.audio.sounds);
+            
+            // Load and play background music
+            const musicLoaded = await this.audio.loadMusic('background', GAME_CONFIG.audio.music.background);
+            if (musicLoaded) {
+                // Start music after a short delay to ensure user interaction
+                setTimeout(() => {
+                    this.audio.playMusic(true);
+                }, 1000);
+            }
+            
+            console.log('✅ Audio system ready');
+        } catch (error) {
+            console.warn('⚠️ Audio initialization failed:', error);
+        }
     }
 
     showFocusHint() {
@@ -126,6 +156,11 @@ export class Game {
         if (this.input) {
             this.input.destroy();
             this.input = null;
+        }
+        
+        if (this.audio) {
+            this.audio.destroy();
+            this.audio = null;
         }
         
         if (this.ui) {
@@ -277,6 +312,12 @@ export class Game {
             player.isAlive = false;
             player.health = 0;
         }
+        
+        // Play death sound
+        if (this.audio) {
+            this.audio.playSound('playerDeath');
+        }
+        
         this.ui.showDeathModal();
     }
 
@@ -303,6 +344,12 @@ export class Game {
             size: type === 'wall' ? 35 : 40 // Larger explosions
         };
         this.explosions.push(explosion);
+        
+        // Play explosion sound
+        if (this.audio) {
+            this.audio.playSound(type === 'wall' ? 'spellHit' : 'spellExplode');
+        }
+        
         console.log('Added explosion:', explosion); // Debug log
     }
 

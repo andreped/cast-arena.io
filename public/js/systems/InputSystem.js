@@ -303,7 +303,10 @@ export class InputSystem {
         
         // Check if player has enough mana
         if (player.mana < GAME_CONFIG.spell.manaCost) {
-            // Could add a visual/audio feedback for insufficient mana here
+            // Play insufficient mana sound
+            if (this.game.audio) {
+                this.game.audio.playSound('insufficientMana');
+            }
             console.log('Not enough mana! Need', GAME_CONFIG.spell.manaCost, 'but only have', player.mana);
             return;
         }
@@ -318,6 +321,11 @@ export class InputSystem {
 
         // Apply client-side recoil for immediate feedback
         player.applyRecoil(angle, GAME_CONFIG.spell.recoilForce);
+
+        // Play spell cast sound
+        if (this.game.audio) {
+            this.game.audio.playSound('spellCast');
+        }
 
         // Trigger casting animation
         this.game.renderer.spriteSystem.createCastAnimation(this.game.myId);
@@ -357,6 +365,11 @@ export class InputSystem {
         // Use Ring of Fire (will deduct mana and charge)
         if (player.useRingOfFire()) {
             console.log('Casting Ring of Fire!');
+            
+            // Play Ring of Fire cast sound
+            if (this.game.audio) {
+                this.game.audio.playSound('ringOfFireCast');
+            }
             
             // Trigger Gandalf-style casting animation
             this.game.renderer.spriteSystem.createRingOfFireCastAnimation(this.game.myId);

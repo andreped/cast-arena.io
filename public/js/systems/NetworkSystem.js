@@ -68,7 +68,37 @@ export class NetworkSystem {
     }
 
     handleItemsUpdate(itemsData) {
+        // Store old items before updating for pickup sound detection
+        const oldItemsMap = new Map(this.game.items);
+        
         this.game.setItems(itemsData);
+        
+        // Check for removed items (someone picked them up)
+        for (const [oldItemId, oldItem] of oldItemsMap) {
+            if (!itemsData[oldItemId]) {
+                // Item was removed - play pickup sound if local player is close
+                const player = this.game.players.get(this.game.myId);
+                if (player && oldItem) {
+                    const distance = Math.sqrt(
+                        Math.pow(player.x - oldItem.x, 2) + 
+                        Math.pow(player.y - oldItem.y, 2)
+                    );
+                    
+                    // Only play sound if player is close (likely picked it up)
+                    if (distance < 50 && this.game.audio) {
+                        console.log(`Playing pickup sound for ${oldItem.type} item`);
+                        if (oldItem.type === 'mana') {
+                            this.game.audio.playSound('pickupMana');
+                        } else if (oldItem.type === 'speed') {
+                            this.game.audio.playSound('pickupSpeed');
+                        } else if (oldItem.type === 'ringOfFire') {
+                            this.game.audio.playSound('pickupRingOfFire');
+                        }
+                    }
+                }
+            }
+        }
+        
         console.log('Received items update:', Object.keys(itemsData).length, 'items');
     }
 
@@ -183,6 +213,11 @@ export class NetworkSystem {
         if (killer) {
             killer.kills = data.killerKills;
             this.game.ui.updateLeaderboard();  // Update leaderboard when kills change
+            
+            // Play kill sound if local player got a kill
+            if (data.killerId === this.game.myId && this.game.audio) {
+                this.game.audio.playSound('killSound');
+            }
         }
     }
 
@@ -202,6 +237,10 @@ export class NetworkSystem {
             });
 
             if (data.id === this.game.myId) {
+                // Play respawn sound for local player
+                if (this.game.audio) {
+                    this.game.audio.playSound('playerRespawn');
+                }
                 this.game.handleLocalPlayerRespawn();
             }
         }
@@ -215,6 +254,10 @@ export class NetworkSystem {
     }
 
     handlePlayerDied() {
+        // Play death sound
+        if (this.game.audio) {
+            this.game.audio.playSound('playerDeath');
+        }
         this.game.handleLocalPlayerDeath();
     }
 
@@ -239,6 +282,11 @@ export class NetworkSystem {
         // Add explosion effect at the specified position
         console.log('Received explosion event:', data); // Debug log
         this.game.addExplosion(data.x, data.y, data.type);
+        
+        // Play explosion sound
+        if (this.game.audio) {
+            this.game.audio.playSound(data.type === 'wall' ? 'spellHit' : 'spellExplode');
+        }
     }
 
     sendMovement(movementData) {
