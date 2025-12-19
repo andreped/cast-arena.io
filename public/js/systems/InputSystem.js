@@ -27,6 +27,8 @@ export class InputSystem {
         this.pendingInputs = new Map(); // Store pending inputs for reconciliation
         this.lastServerUpdate = 0;
         this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
+        this.lastReconciliationTime = 0; // Track when we last applied a correction
+        this.minReconciliationInterval = 0; // Minimum time between corrections (adaptive)
         
         // Advanced smoothing system for jitter reduction
         this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
@@ -599,25 +601,21 @@ export class InputSystem {
         }
         
         if (totalDelta > reconciliationThreshold) {
-            // For speed-boosted players, use much gentler corrections
-            let correctionFactor;
-            if (speedMultiplier > 1.2) {
-                // Very gentle corrections for speed-boosted players
-                correctionFactor = 0.05 / speedMultiplier; // Even smaller corrections to reduce pushback
-                
-                // Further reduce correction if player is actively moving (to prevent pushback during movement)
-                const isMoving = this.keys.w || this.keys.a || this.keys.s || this.keys.d || 
-                               this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight ||
-                               (this.isMobile && this.joystickActive);
-                
-                if (isMoving) {
-                    correctionFactor *= 0.3; // Reduce correction by 70% when actively moving
-                }
-            } else {
-                // Reasonable correction factor for normal players
-                const baseCorrectionFactor = 0.15; // Reduced from 0.3 to be gentler
-                correctionFactor = baseCorrectionFactor / Math.max(1.0, speedMultiplier * 0.8);
+            // Throttle reconciliation frequency based on latency to prevent jitter
+            // Higher latency = less frequent corrections
+            const now = performance.now();
+            this.minReconciliationInterval = latency * 1.5; // Wait 1.5x latency between corrections
+            
+            if (now - this.lastReconciliationTime < this.minReconciliationInterval) {
+                // Skip this correction - too soon after last one
+                this.pendingInputs.delete(serverData.sequence);
+                return;
             }
+            
+            this.lastReconciliationTime = now;
+            
+            // Gentle, consistent correction strength
+            const correctionFactor = 0.2; // Simple 20% correction
             
             player.x += deltaX * correctionFactor;
             player.y += deltaY * correctionFactor;
@@ -625,10 +623,7 @@ export class InputSystem {
             this.debugStats.reconciliations++;
             
             if (this.debugMode) {
-                const isMoving = this.keys.w || this.keys.a || this.keys.s || this.keys.d || 
-                               this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight ||
-                               (this.isMobile && this.joystickActive);
-                this.addDebugLog(`🔧 SPEED-AWARE CORRECT: threshold=${reconciliationThreshold.toFixed(1)}px, factor=${(correctionFactor * 100).toFixed(1)}%, speed=${speedMultiplier.toFixed(1)}x, moving=${isMoving}`);
+                this.addDebugLog(`🔧 CORRECT: Δ=${totalDelta.toFixed(1)}px, threshold=${reconciliationThreshold.toFixed(1)}px, interval=${this.minReconciliationInterval.toFixed(0)}ms`);
             }
         }
 
