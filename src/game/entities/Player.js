@@ -172,6 +172,13 @@ class Player {
         return gameConfig.player.speed * this.currentSpeedMultiplier;
     }
 
+    applyRecoil(angle, force) {
+        // Apply recoil force in the opposite direction of the spell
+        const recoilAngle = angle + Math.PI;
+        this.velocityX += Math.cos(recoilAngle) * force;
+        this.velocityY += Math.sin(recoilAngle) * force;
+    }
+
     // Mana change tracking methods for optimization
     hasManaChanged() {
         return this.manaChanged;

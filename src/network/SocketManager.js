@@ -136,7 +136,17 @@ class SocketManager {
             spellData.angle
         );
 
+        // Apply recoil to the player
+        player.applyRecoil(spellData.angle, gameConfig.spells.fireball.recoilForce);
+
         this.io.emit('spellCast', spell.toJSON());
+        
+        // Broadcast recoil to all clients
+        this.io.emit('playerRecoil', {
+            id: socket.id,
+            velocityX: player.velocityX,
+            velocityY: player.velocityY
+        });
         
         // Send mana update after spell cast
         this.emitManaUpdate(player);

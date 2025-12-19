@@ -22,7 +22,8 @@ export const GAME_CONFIG = {
         size: 8,
         speed: 400,
         damage: 20,
-        manaCost: 5
+        manaCost: 5,
+        recoilForce: 300
     },
     mobile: {
         fireDelay: 300

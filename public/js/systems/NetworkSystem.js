@@ -37,6 +37,7 @@ export class NetworkSystem {
         this.socket.on('ringOfFireCast', this.handleRingOfFireCast.bind(this));
         this.socket.on('manaUpdate', this.handleManaUpdate.bind(this));
         this.socket.on('serverTps', this.handleServerTps.bind(this));
+        this.socket.on('playerRecoil', this.handlePlayerRecoil.bind(this));
         
         // Throttling for movement updates
         this.lastMovementUpdate = 0;
@@ -289,5 +290,14 @@ export class NetworkSystem {
         
         // Play Ring of Fire sound effect (if we had one)
         // this.game.audio.playRingOfFireSound();
+    }
+
+    handlePlayerRecoil(data) {
+        const player = this.game.players.get(data.id);
+        if (player && data.id !== this.game.myId) {
+            // Apply recoil velocity from server to other players
+            player.velocityX = data.velocityX;
+            player.velocityY = data.velocityY;
+        }
     }
 }

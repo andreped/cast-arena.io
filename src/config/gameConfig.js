@@ -18,7 +18,8 @@ const gameConfig = {
         fireball: {
             speed: 400,
             damage: 20,
-            manaCost: 5
+            manaCost: 5,
+            recoilForce: 300
         }
     },
     burnEffect: {
