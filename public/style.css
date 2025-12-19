@@ -136,7 +136,7 @@ h1 {
     padding: 30px;
     border: 3px solid #34495e;
     border-radius: 15px;
-    width: 300px;
+    width: 450px;
     text-align: center;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
@@ -177,6 +177,144 @@ h1 {
     margin-top: 20px;
     font-size: 12px;
     opacity: 0.6;
+}
+
+/* Modal Tabs */
+.modal-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.tab-button {
+    flex: 1;
+    padding: 10px 15px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+}
+
+.tab-button:hover {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.tab-button.active {
+    color: #FFD700;
+    border-bottom-color: #FFD700;
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Settings Panel */
+.settings-section {
+    margin-top: 10px;
+}
+
+.settings-section h3 {
+    font-size: 16px;
+    color: #4ECDC4;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.audio-control {
+    display: grid;
+    grid-template-columns: 105px 35px 1fr 50px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.audio-control label {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+    text-align: left;
+}
+
+.mute-btn-modal {
+    width: 35px;
+    height: 35px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mute-btn-modal:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.mute-btn-modal.muted {
+    background: rgba(231, 76, 60, 0.7);
+}
+
+.volume-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #4ECDC4;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+    background: #3DBDB4;
+    transform: scale(1.2);
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #4ECDC4;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+    background: #3DBDB4;
+    transform: scale(1.2);
+}
+
+.volume-value {
+    min-width: 35px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: right;
 }
 
 /* Removed canvas hover zoom effect that was causing bounce/zoom on hover */
