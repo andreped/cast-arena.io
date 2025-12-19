@@ -741,4 +741,42 @@ export class UISystem {
         setupMuteButton(muteMusicModal, 'music');
         setupMuteButton(muteSfxModal, 'sfx');
     }
+    
+    addKillFeedEntry(killerName, victimName, weapon = '🔥') {
+        const killFeed = document.getElementById('killFeed');
+        if (!killFeed) return;
+        
+        const entry = document.createElement('div');
+        entry.className = 'kill-feed-entry';
+        
+        // Check if it's a suicide (environment death, etc.)
+        if (killerName === victimName || !killerName) {
+            entry.classList.add('suicide');
+            entry.innerHTML = `<span class="victim">${victimName}</span> died`;
+        } else {
+            entry.innerHTML = `
+                <span class="killer">${killerName}</span>
+                <span class="weapon">${weapon}</span>
+                <span class="victim">${victimName}</span>
+            `;
+        }
+        
+        // Add to top of feed
+        killFeed.insertBefore(entry, killFeed.firstChild);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            entry.classList.add('fade-out');
+            setTimeout(() => {
+                if (entry.parentNode) {
+                    entry.remove();
+                }
+            }, 500);
+        }, 5000);
+        
+        // Limit to 5 entries
+        while (killFeed.children.length > 5) {
+            killFeed.lastChild.remove();
+        }
+    }
 }

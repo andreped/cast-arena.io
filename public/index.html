@@ -41,6 +41,9 @@
             <!-- Active Effects Display -->
             <div id="activeEffects"></div>
             
+            <!-- Kill Feed -->
+            <div id="killFeed"></div>
+            
             <div id="minimap">
                 <canvas id="minimapCanvas" width="120" height="90"></canvas>
                 <div id="minimapTitle">Minimap</div>
@@ -121,12 +124,12 @@
     <!-- FPS Monitor -->
     <div id="fpsMonitor" style="position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; font-family: monospace; font-size: 14px; border-radius: 5px; z-index: 1000; width: 120px;">
         <div id="clientFps" style="color: #00ff00; font-size: 12px; display: flex; justify-content: space-between; width: 100%;">
-            <span>Client:</span> <span>NA FPS</span>
+            <span>Client:</span> <span>0 FPS</span>
         </div>
-        <div id="serverTps" style="color: #ffaa00; font-size: 12px; display: flex; justify-content: space-between; width: 100%;">
+        <div id="serverFps" style="color: #00aaff; font-size: 12px; display: flex; justify-content: space-between; width: 100%;">
             <span>Server:</span> <span>NA TPS</span>
         </div>
-        <div id="frameTime" style="color: #ff6600; font-size: 12px; display: flex; justify-content: space-between; width: 100%;">
+        <div id="frameTime" style="color: #ffaa00; font-size: 12px; display: flex; justify-content: space-between; width: 100%;">
             <span>Frame:</span> <span>NA ms</span>
         </div>
     </div>
