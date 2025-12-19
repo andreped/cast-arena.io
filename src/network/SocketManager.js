@@ -55,7 +55,8 @@ class SocketManager {
             return;
         }
 
-        // Update player velocity from client (for server-side physics simulation)
+        // Server-authoritative physics: trust velocity from client, simulate position
+        // This ensures client and server calculate the same position from the same velocity
         if (movementData.velocityX !== undefined) {
             player.velocityX = movementData.velocityX;
         }
@@ -63,13 +64,18 @@ class SocketManager {
             player.velocityY = movementData.velocityY;
         }
 
+        // Use client position as the authoritative position
+        // The client has already simulated physics correctly with this velocity
+        let finalX = movementData.x;
+        let finalY = movementData.y;
+
         // Check wall collision before allowing movement
         const playerRadius = 20; // Player collision radius
-        const wallCollision = this.gameState.checkWallCollision(movementData.x, movementData.y, playerRadius);
+        const wallCollision = this.gameState.checkWallCollision(finalX, finalY, playerRadius);
         
         if (!wallCollision) {
-            player.x = movementData.x;
-            player.y = movementData.y;
+            player.x = finalX;
+            player.y = finalY;
             if (movementData.facingLeft !== undefined) {
                 player.facingLeft = movementData.facingLeft;
             }
@@ -83,8 +89,8 @@ class SocketManager {
             // Broadcast to other players (include velocity for smooth interpolation)
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
-                x: movementData.x,
-                y: movementData.y,
+                x: player.x,
+                y: player.y,
                 velocityX: player.velocityX,
                 velocityY: player.velocityY,
                 facingLeft: player.facingLeft,
@@ -93,6 +99,24 @@ class SocketManager {
             });
 
             // Send reconciliation data back to the client with sequence number
+            // CRITICAL: Send back the SAME position client sent, since physics are identical
+            if (movementData.sequence) {
+                socket.emit('playerMoved', {
+                    id: socket.id,
+                    x: player.x,
+                    y: player.y,
+                    velocityX: player.velocityX,
+                    velocityY: player.velocityY,
+                    sequence: movementData.sequence,
+                    timestamp: Date.now()
+                });
+            }
+        } else {
+            // Wall collision detected - reset velocity and reject movement
+            player.velocityX = 0;
+            player.velocityY = 0;
+            
+            // Send back current (unchanged) position to force client correction
             if (movementData.sequence) {
                 socket.emit('playerMoved', {
                     id: socket.id,

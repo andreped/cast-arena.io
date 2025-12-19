@@ -580,9 +580,13 @@ export class InputSystem {
             this.lastReconciliationTime = now;
         }
 
-        // Calculate difference between client prediction and server position
-        const deltaX = serverData.x - player.x;
-        const deltaY = serverData.y - player.y;
+        // Calculate difference between server position and CLIENT POSITION AT THAT SEQUENCE
+        // Don't compare with current position - that's moved forward during network latency!
+        const clientXAtSequence = pendingInput.x;
+        const clientYAtSequence = pendingInput.y;
+        
+        const deltaX = serverData.x - clientXAtSequence;
+        const deltaY = serverData.y - clientYAtSequence;
         const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
         // Track largest delta for debugging
