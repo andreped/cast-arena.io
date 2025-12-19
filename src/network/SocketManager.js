@@ -55,6 +55,14 @@ class SocketManager {
             return;
         }
 
+        // Update player velocity from client (for server-side physics simulation)
+        if (movementData.velocityX !== undefined) {
+            player.velocityX = movementData.velocityX;
+        }
+        if (movementData.velocityY !== undefined) {
+            player.velocityY = movementData.velocityY;
+        }
+
         // Check wall collision before allowing movement
         const playerRadius = 20; // Player collision radius
         const wallCollision = this.gameState.checkWallCollision(movementData.x, movementData.y, playerRadius);
@@ -72,11 +80,13 @@ class SocketManager {
             // Check for item pickups at new position
             this.checkItemPickupsForPlayer(socket.id, player);
 
-            // Broadcast to other players
+            // Broadcast to other players (include velocity for smooth interpolation)
             socket.broadcast.emit('playerMoved', {
                 id: socket.id,
                 x: movementData.x,
                 y: movementData.y,
+                velocityX: player.velocityX,
+                velocityY: player.velocityY,
                 facingLeft: player.facingLeft,
                 aimingAngle: player.aimingAngle,
                 isAlive: player.isAlive
@@ -88,6 +98,8 @@ class SocketManager {
                     id: socket.id,
                     x: player.x,
                     y: player.y,
+                    velocityX: player.velocityX,
+                    velocityY: player.velocityY,
                     sequence: movementData.sequence,
                     timestamp: Date.now()
                 });

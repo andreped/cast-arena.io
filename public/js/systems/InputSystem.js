@@ -513,6 +513,8 @@ export class InputSystem {
                         timestamp: now,
                         x: finalX,
                         y: finalY,
+                        velocityX: player.velocityX,
+                        velocityY: player.velocityY,
                         inputX: newPosition.x,
                         inputY: newPosition.y
                     };
@@ -593,9 +595,10 @@ export class InputSystem {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
         }
 
-        // Latency-adaptive threshold - higher latency = more lenient threshold
-        const baseThreshold = 3.0; // Increased from 2.0 for high-latency tolerance
-        const latencyFactor = Math.max(1.0, latency / 40); // More aggressive scaling (was /50)
+        // Latency-adaptive threshold
+        // With velocity-based server physics, drift should be minimal
+        const baseThreshold = 5.0; // Slightly higher for network jitter tolerance
+        const latencyFactor = Math.max(1.0, latency / 50);
         const speedMultiplier = playerSpeedMultiplier;
         
         let reconciliationThreshold;
