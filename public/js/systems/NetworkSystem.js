@@ -283,7 +283,15 @@ export class NetworkSystem {
         Object.entries(gameState).forEach(([id, data]) => {
             const player = this.game.players.get(id);
             if (player) {
-                player.update(data);
+                // For local player: don't overwrite position (client-side prediction is authoritative)
+                // Only update non-position properties like health, mana, speed buffs
+                if (id === this.game.myId) {
+                    const { x, y, velocityX, velocityY, ...nonPositionData } = data;
+                    player.update(nonPositionData);
+                } else {
+                    // For other players: full update (they're server-authoritative)
+                    player.update(data);
+                }
             }
         });
     }
