@@ -26,11 +26,11 @@ export class InputSystem {
         this.inputSequence = 0;
         this.pendingInputs = new Map(); // Store pending inputs for reconciliation
         this.lastServerUpdate = 0;
-        this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
+        this.reconciliationThreshold = 5; // Base threshold in pixels - will scale with latency
         
         // Network send throttling - critical for high-latency connections
         this.lastNetworkSend = 0;
-        this.networkSendInterval = 25; // Send position updates every 25ms (~40 updates/sec)
+        this.networkSendInterval = 30; // Send position updates every 30ms (~33 updates/sec) - optimized for Render
         
         // Advanced smoothing system for jitter reduction
         this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
@@ -594,8 +594,8 @@ export class InputSystem {
         }
 
         // Latency-adaptive threshold - higher latency = more lenient threshold
-        const baseThreshold = 2.0;
-        const latencyFactor = Math.max(1.0, latency / 50);
+        const baseThreshold = 3.0; // Increased from 2.0 for high-latency tolerance
+        const latencyFactor = Math.max(1.0, latency / 40); // More aggressive scaling (was /50)
         const speedMultiplier = playerSpeedMultiplier;
         
         let reconciliationThreshold;
@@ -606,10 +606,21 @@ export class InputSystem {
         }
         
         if (totalDelta > reconciliationThreshold) {
-            // Use VERY gentle corrections that scale inversely with latency
-            // High latency = even gentler to avoid visible jumps
-            const baseCorrection = 0.1; // Start with 10% correction
-            const latencyCorrectionFactor = Math.min(1.0, 30 / latency); // Scale down heavily for high latency
+            // Error-magnitude adaptive correction: larger errors = gentler smoothing
+            // Small errors (< 10px): 12% per frame (~8 frames)
+            // Medium errors (10-20px): 8% per frame (~13 frames)
+            // Large errors (> 20px): 5% per frame (~20 frames)
+            let baseCorrection;
+            if (totalDelta < 10) {
+                baseCorrection = 0.12;
+            } else if (totalDelta < 20) {
+                baseCorrection = 0.08;
+            } else {
+                baseCorrection = 0.05;
+            }
+            
+            // Further reduce at very high latency (>100ms) to prevent oscillation
+            const latencyCorrectionFactor = latency > 100 ? 0.75 : 1.0;
             const correctionFactor = baseCorrection * latencyCorrectionFactor;
             
             player.x += deltaX * correctionFactor;
@@ -618,7 +629,8 @@ export class InputSystem {
             this.debugStats.reconciliations++;
             
             if (this.debugMode) {
-                this.addDebugLog(`🔧 CORRECT: Δ=${totalDelta.toFixed(1)}px, factor=${(correctionFactor * 100).toFixed(1)}%, latency=${latency.toFixed(0)}ms`);
+                const frames = (1 / correctionFactor).toFixed(0);
+                this.addDebugLog(`🔧 CORRECT: Δ=${totalDelta.toFixed(1)}px, ${(correctionFactor * 100).toFixed(1)}%/frame (~${frames}f), latency=${latency.toFixed(0)}ms`);
             }
         }
 
