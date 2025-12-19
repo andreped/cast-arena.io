@@ -594,8 +594,8 @@ export class InputSystem {
             this.debugStats.largestDelta = totalDelta;
         }
 
-        // Debug logging
-        if (this.debugMode || window.location.hostname === 'localhost') {
+        // Debug logging (only in debug mode, not production)
+        if (this.debugMode) {
             this.addDebugLog(`RECONCILE #${serverData.sequence}: Δ=${totalDelta.toFixed(1)}px, latency=${latency.toFixed(1)}ms`);
         }
 
