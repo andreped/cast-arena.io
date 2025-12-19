@@ -27,8 +27,6 @@ export class InputSystem {
         this.pendingInputs = new Map(); // Store pending inputs for reconciliation
         this.lastServerUpdate = 0;
         this.reconciliationThreshold = 3; // Max pixels difference before reconciliation (increased back up to reduce sensitivity)
-        this.lastReconciliationTime = 0; // Track when we last applied a correction
-        this.minReconciliationInterval = 0; // Minimum time between corrections (adaptive)
         
         // Advanced smoothing system for jitter reduction
         this.positionDebt = { x: 0, y: 0 }; // Accumulated position difference to smooth out
@@ -585,37 +583,23 @@ export class InputSystem {
         }
 
         // Latency-adaptive threshold - higher latency = more lenient threshold
-        // This prevents jitter on high-latency connections (like Render free tier)
         const baseThreshold = 2.0;
-        const latencyFactor = Math.max(1.0, latency / 50); // Scale based on latency (50ms baseline)
+        const latencyFactor = Math.max(1.0, latency / 50);
         const speedMultiplier = playerSpeedMultiplier;
         
-        // For speed-boosted players, be much more lenient with position differences
         let reconciliationThreshold;
         if (speedMultiplier > 1.2) {
-            // Much higher threshold for speed-boosted players to prevent constant corrections
             reconciliationThreshold = baseThreshold * speedMultiplier * 3.0 * latencyFactor;
         } else {
-            // Adapt threshold based on latency for normal players
             reconciliationThreshold = baseThreshold * Math.max(1.0, speedMultiplier) * latencyFactor;
         }
         
         if (totalDelta > reconciliationThreshold) {
-            // Throttle reconciliation frequency based on latency to prevent jitter
-            // Higher latency = less frequent corrections
-            const now = performance.now();
-            this.minReconciliationInterval = latency * 1.5; // Wait 1.5x latency between corrections
-            
-            if (now - this.lastReconciliationTime < this.minReconciliationInterval) {
-                // Skip this correction - too soon after last one
-                this.pendingInputs.delete(serverData.sequence);
-                return;
-            }
-            
-            this.lastReconciliationTime = now;
-            
-            // Gentle, consistent correction strength
-            const correctionFactor = 0.2; // Simple 20% correction
+            // Use VERY gentle corrections that scale inversely with latency
+            // High latency = even gentler to avoid visible jumps
+            const baseCorrection = 0.1; // Start with 10% correction
+            const latencyCorrectionFactor = Math.min(1.0, 30 / latency); // Scale down heavily for high latency
+            const correctionFactor = baseCorrection * latencyCorrectionFactor;
             
             player.x += deltaX * correctionFactor;
             player.y += deltaY * correctionFactor;
@@ -623,7 +607,7 @@ export class InputSystem {
             this.debugStats.reconciliations++;
             
             if (this.debugMode) {
-                this.addDebugLog(`🔧 CORRECT: Δ=${totalDelta.toFixed(1)}px, threshold=${reconciliationThreshold.toFixed(1)}px, interval=${this.minReconciliationInterval.toFixed(0)}ms`);
+                this.addDebugLog(`🔧 CORRECT: Δ=${totalDelta.toFixed(1)}px, factor=${(correctionFactor * 100).toFixed(1)}%, latency=${latency.toFixed(0)}ms`);
             }
         }
 
