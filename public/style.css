@@ -632,3 +632,74 @@ h1 {
         filter: brightness(1.2);
     }
 }
+
+/* Kill Feed */
+#killFeed {
+    pointer-events: none;
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 280px;
+    z-index: 100;
+}
+
+.kill-feed-entry {
+    background: rgba(0, 0, 0, 0.85);
+    border-left: 3px solid #FF6B6B;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    border-radius: 5px;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    animation: killFeedSlideIn 0.3s ease-out, killFeedFadeOut 0.5s ease-in 4.5s;
+    opacity: 1;
+}
+
+.kill-feed-entry.fade-out {
+    animation: killFeedFadeOut 0.5s ease-in forwards;
+}
+
+.kill-feed-entry .killer {
+    color: #FF6B6B;
+    font-weight: bold;
+}
+
+.kill-feed-entry .victim {
+    color: #4ECDC4;
+    font-weight: bold;
+}
+
+.kill-feed-entry .weapon {
+    color: #FFD700;
+    margin: 0 5px;
+}
+
+.kill-feed-entry.suicide {
+    border-left-color: #888;
+}
+
+.kill-feed-entry.suicide .victim {
+    color: #888;
+}
+
+@keyframes killFeedSlideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes killFeedFadeOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+}

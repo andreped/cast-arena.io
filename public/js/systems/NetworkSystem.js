@@ -210,6 +210,8 @@ export class NetworkSystem {
 
     handlePlayerKilled(data) {
         const killer = this.game.players.get(data.killerId);
+        const victim = this.game.players.get(data.victimId);
+        
         if (killer) {
             killer.kills = data.killerKills;
             this.game.ui.updateLeaderboard();  // Update leaderboard when kills change
@@ -219,6 +221,14 @@ export class NetworkSystem {
                 this.game.audio.playSound('killSound');
             }
         }
+        
+        // Add kill feed entry
+        const killerName = data.killerId === this.game.myId ? 'You' : 
+                          killer ? `Player ${data.killerId.slice(0, 4)}` : null;
+        const victimName = data.victimId === this.game.myId ? 'You' : 
+                          victim ? `Player ${data.victimId.slice(0, 4)}` : 'Unknown';
+        
+        this.game.ui.addKillFeedEntry(killerName, victimName, '🔥');
     }
 
     handlePlayerRespawned(data) {
