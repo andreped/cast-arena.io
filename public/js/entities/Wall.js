@@ -1,3 +1,5 @@
+import { GAME_CONFIG } from '../config/gameConfig.js';
+
 export class Wall {
     constructor(data) {
         this.id = data.id;
@@ -81,10 +83,12 @@ export class Wall {
         return t >= 0 && t <= 1 && u >= 0 && u <= 1;
     }
 
-    isInViewport(cameraX, cameraY, viewportWidth = 800, viewportHeight = 600) {
-        return this.x < cameraX + viewportWidth &&
+    isInViewport(cameraX, cameraY, viewportWidth = null, viewportHeight = null) {
+        const vpWidth = viewportWidth || GAME_CONFIG.viewport.getWidth();
+        const vpHeight = viewportHeight || GAME_CONFIG.viewport.getHeight();
+        return this.x < cameraX + vpWidth &&
                this.x + this.width > cameraX &&
-               this.y < cameraY + viewportHeight &&
+               this.y < cameraY + vpHeight &&
                this.y + this.height > cameraY;
     }
 }

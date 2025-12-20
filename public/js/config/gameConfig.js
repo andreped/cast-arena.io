@@ -1,7 +1,12 @@
 export const GAME_CONFIG = {
     canvas: {
-        width: 800,
-        height: 600
+        width: 800,  // Default/fallback values
+        height: 600,
+        dynamicViewport: true,  // Enable dynamic viewport sizing
+        minWidth: 800,  // Minimum viewport width (prevents zoom abuse)
+        minHeight: 600, // Minimum viewport height (prevents zoom abuse)
+        maxWidth: 1920, // Maximum viewport width for fairness
+        maxHeight: 1080 // Maximum viewport height for fairness
     },
     world: {
         width: 800 * 3,
@@ -82,6 +87,34 @@ export const GAME_CONFIG = {
         },
         music: {
             background: 'assets/sounds/music/background.wav'
+        }
+    },
+    // Dynamic viewport utilities
+    viewport: {
+        getWidth() {
+            if (!GAME_CONFIG.canvas.dynamicViewport) {
+                return GAME_CONFIG.canvas.width;
+            }
+            const rawWidth = window.innerWidth;
+            // Enforce minimum and maximum to prevent zoom abuse
+            return Math.min(GAME_CONFIG.canvas.maxWidth, 
+                   Math.max(GAME_CONFIG.canvas.minWidth, rawWidth));
+        },
+        getHeight() {
+            if (!GAME_CONFIG.canvas.dynamicViewport) {
+                return GAME_CONFIG.canvas.height;
+            }
+            const rawHeight = window.innerHeight - 60; // Subtract 60px for bottom UI
+            // Enforce minimum and maximum to prevent zoom abuse
+            return Math.min(GAME_CONFIG.canvas.maxHeight, 
+                   Math.max(GAME_CONFIG.canvas.minHeight, rawHeight));
+        },
+        getAspectRatio() {
+            return this.getWidth() / this.getHeight();
+        },
+        // Get effective FOV (field of view) area
+        getFOVArea() {
+            return this.getWidth() * this.getHeight();
         }
     }
 };

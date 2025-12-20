@@ -1,3 +1,5 @@
+import { GAME_CONFIG } from '../config/gameConfig.js';
+
 export class SpeedItem {
     constructor(data) {
         this.id = data.id;
@@ -21,10 +23,12 @@ export class SpeedItem {
         return distance < (this.pickupRadius + playerRadius);
     }
 
-    isInViewport(cameraX, cameraY, viewportWidth = 800, viewportHeight = 600) {
+    isInViewport(cameraX, cameraY, viewportWidth = null, viewportHeight = null) {
+        const vpWidth = viewportWidth || GAME_CONFIG.viewport.getWidth();
+        const vpHeight = viewportHeight || GAME_CONFIG.viewport.getHeight();
         return this.x > cameraX - this.size &&
-               this.x < cameraX + viewportWidth + this.size &&
+               this.x < cameraX + vpWidth + this.size &&
                this.y > cameraY - this.size &&
-               this.y < cameraY + viewportHeight + this.size;
+               this.y < cameraY + vpHeight + this.size;
     }
 }

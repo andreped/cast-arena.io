@@ -148,10 +148,12 @@ export class Spell {
     }
 
     isInViewport(cameraX, cameraY) {
-        const padding = GAME_CONFIG.canvas.width; // Extra padding for spell trails
+        const viewportWidth = GAME_CONFIG.viewport.getWidth();
+        const viewportHeight = GAME_CONFIG.viewport.getHeight();
+        const padding = viewportWidth; // Extra padding for spell trails
         return this.x >= cameraX - padding &&
-               this.x <= cameraX + GAME_CONFIG.canvas.width + padding &&
+               this.x <= cameraX + viewportWidth + padding &&
                this.y >= cameraY - padding &&
-               this.y <= cameraY + GAME_CONFIG.canvas.height + padding;
+               this.y <= cameraY + viewportHeight + padding;
     }
 }

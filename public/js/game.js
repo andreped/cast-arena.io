@@ -17,6 +17,9 @@ export class Game {
         this.canvas = document.getElementById('gameCanvas');
         this.minimapCanvas = document.getElementById('minimapCanvas');
         
+        // Set up dynamic viewport
+        this.setupDynamicViewport();
+        
         // Make canvas focusable and auto-focus for immediate keyboard input
         this.canvas.setAttribute('tabindex', '0');
         this.canvas.focus();
@@ -64,6 +67,47 @@ export class Game {
         // Start game loop
         this.lastUpdateTime = performance.now();
         this.gameLoop();
+    }
+    
+    setupDynamicViewport() {
+        // Set initial canvas size
+        this.resizeCanvas();
+        
+        // Listen for window resize events
+        window.addEventListener('resize', () => {
+            this.resizeCanvas();
+        });
+    }
+    
+    resizeCanvas() {
+        if (!GAME_CONFIG.canvas.dynamicViewport) return;
+        
+        // Get viewport dimensions with zoom protection
+        const width = GAME_CONFIG.viewport.getWidth();
+        const height = GAME_CONFIG.viewport.getHeight();
+        
+        // Update canvas dimensions with enforced limits
+        this.canvas.width = width;
+        this.canvas.height = height;
+        
+        // Update canvas size in game config for other systems to use
+        GAME_CONFIG.canvas.width = width;
+        GAME_CONFIG.canvas.height = height;
+        
+        // Update minimap size proportionally
+        const minimapScale = Math.min(width, height) * 0.15; // 15% of smaller dimension
+        this.minimapCanvas.width = minimapScale;
+        this.minimapCanvas.height = minimapScale * 0.75; // Maintain aspect ratio
+        
+        // Reinitialize renderer to handle new dimensions
+        if (this.renderer) {
+            this.renderer.ctx.imageSmoothingEnabled = false;
+            this.renderer.ctx.webkitImageSmoothingEnabled = false;
+            this.renderer.ctx.mozImageSmoothingEnabled = false;
+            this.renderer.ctx.msImageSmoothingEnabled = false;
+        }
+        
+        console.log(`Canvas resized to: ${width}x${height} (protected from zoom abuse)`);
     }
 
     async initializeAudio() {
@@ -282,8 +326,11 @@ export class Game {
         if (!this.myId || !this.players.has(this.myId)) return;
         
         const player = this.players.get(this.myId);
-        const targetX = player.x - this.canvas.width / 2;
-        const targetY = player.y - this.canvas.height / 2;
+        const canvasWidth = GAME_CONFIG.viewport.getWidth();
+        const canvasHeight = GAME_CONFIG.viewport.getHeight();
+        
+        const targetX = player.x - canvasWidth / 2;
+        const targetY = player.y - canvasHeight / 2;
         
         if (instant) {
             this.camera.x = targetX;
@@ -295,9 +342,20 @@ export class Game {
             this.camera.y += (targetY - this.camera.y) * smoothness;
         }
         
-        // Keep camera within world bounds
-        this.camera.x = Math.max(0, Math.min(GAME_CONFIG.world.width - this.canvas.width, this.camera.x));
-        this.camera.y = Math.max(0, Math.min(GAME_CONFIG.world.height - this.canvas.height, this.camera.y));
+        // Keep camera within world bounds - ensure world edges are always visible
+        const maxCameraX = Math.max(0, GAME_CONFIG.world.width - canvasWidth);
+        const maxCameraY = Math.max(0, GAME_CONFIG.world.height - canvasHeight);
+        
+        this.camera.x = Math.max(0, Math.min(maxCameraX, this.camera.x));
+        this.camera.y = Math.max(0, Math.min(maxCameraY, this.camera.y));
+        
+        // Additional safety: if viewport is larger than world, center the world
+        if (canvasWidth >= GAME_CONFIG.world.width) {
+            this.camera.x = -(canvasWidth - GAME_CONFIG.world.width) / 2;
+        }
+        if (canvasHeight >= GAME_CONFIG.world.height) {
+            this.camera.y = -(canvasHeight - GAME_CONFIG.world.height) / 2;
+        }
     }
 
     updateSpells(deltaTime) {

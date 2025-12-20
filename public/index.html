@@ -13,10 +13,9 @@
         <h1>🧙‍♂️ Cast Arena</h1>
         <div id="gameInfo">
             <span id="playerCount">Players Online: 0</span>
-            <span id="instructions">Use WASD to move, Click/Space to cast fireball, ESC for leaderboard</span>
         </div>
         <div id="gameArea">
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <canvas id="gameCanvas"></canvas>
             
             <!-- Player Stats UI -->
             <div id="playerStats">
@@ -49,9 +48,14 @@
                 <div id="minimapTitle">Minimap</div>
             </div>
         </div>
-        <div id="controls">
-            <p>Desktop: WASD to move, Click/Space to cast | Mobile: Use touch controls</p>
-            <p>🔥 Fireball: 20 damage + 2 damage/sec for 10 seconds | 💙 Mana: 5 per cast, regens 2/sec</p>
+        
+        <!-- Bottom UI Bar for Tutorial -->
+        <div id="bottomUI">
+            <div id="tutorialInfo">
+                Desktop: WASD to move, Click/Space to cast | Mobile: Use touch controls<br>
+                🔥 Fireball: 20 damage + 2 damage/sec for 10 seconds | 🧪 Mana: 5 per cast, regens 2/sec
+            </div>
+        </div>
         </div>
     </div>
 
