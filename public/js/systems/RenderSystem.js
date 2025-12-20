@@ -49,13 +49,15 @@ export class RenderSystem {
     }
 
     drawWorldBoundaries() {
-        this.ctx.strokeStyle = '#444';
+        const theme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
+        this.ctx.strokeStyle = theme.worldBoundaryColor;
         this.ctx.lineWidth = 2;
         this.ctx.strokeRect(0, 0, GAME_CONFIG.world.width, GAME_CONFIG.world.height);
     }
 
     drawGrid() {
-        this.ctx.strokeStyle = `rgba(255, 255, 255, ${GAME_CONFIG.grid.opacity})`;
+        const theme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
+        this.ctx.strokeStyle = theme.gridColor;
         this.ctx.lineWidth = 1;
 
         const canvasWidth = GAME_CONFIG.viewport.getWidth();
@@ -108,16 +110,24 @@ export class RenderSystem {
                 const rand1 = this.seededRandom(combinedSeed);
                 const rand2 = this.seededRandom(combinedSeed + 1000);
                 
+                // Get available patterns and their weights from current theme
+                const patterns = GAME_CONFIG.floor.patterns;
+                const patternNames = Object.keys(patterns);
+                
                 // Determine tile type based on weighted random
-                let tileType = 'stone';
-                if (rand1 < GAME_CONFIG.floor.patterns.darkStone.weight) {
-                    tileType = 'darkStone';
-                } else if (rand1 > (1 - GAME_CONFIG.floor.patterns.accent.weight)) {
-                    tileType = 'accent';
+                let tileType = patternNames[0]; // Default to first pattern
+                let currentWeight = 0;
+                
+                for (const patternName of patternNames) {
+                    currentWeight += patterns[patternName].weight;
+                    if (rand1 <= currentWeight) {
+                        tileType = patternName;
+                        break;
+                    }
                 }
                 
                 // Choose variant within the tile type
-                const variants = GAME_CONFIG.floor.patterns[tileType].variants;
+                const variants = patterns[tileType].variants;
                 const variantIndex = Math.floor(rand2 * variants.length);
                 const color = variants[variantIndex];
                 
@@ -214,33 +224,37 @@ export class RenderSystem {
     }
 
     drawWallSegment(x, y, width, height, wallType) {
-        // Base wall color
+        const theme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
+        const walls = theme.walls;
+        
+        // Default colors
         let baseColor = '#666666';
         let edgeColor = '#888888';
         let shadowColor = '#333333';
         
-        // Different colors for different wall types
-        switch (wallType) {
-            case 'house':
-                baseColor = '#8B4513';
-                edgeColor = '#A0522D';
-                shadowColor = '#654321';
-                break;
-            case 'window':
-                baseColor = '#708090';
-                edgeColor = '#9370DB';
-                shadowColor = '#2F4F4F';
-                break;
-            case 'L':
-                baseColor = '#696969';
-                edgeColor = '#808080';
-                shadowColor = '#2F2F2F';
-                break;
-            case 'perimeter':
-                baseColor = '#4A4A4A';
-                edgeColor = '#5A5A5A';
-                shadowColor = '#1A1A1A';
-                break;
+        // For woods theme, add variety with different wood types
+        if (GAME_CONFIG.themes.current === 'woods' && wallType !== 'perimeter') {
+            // Create deterministic randomness based on wall position
+            const seed = x * 73 + y * 37 + width * 17 + height * 23;
+            const rand = this.seededRandom(seed);
+            
+            const woodTypes = ['oakWood', 'darkOak', 'weatheredWood', 'ageWood'];
+            const selectedWood = woodTypes[Math.floor(rand * woodTypes.length)];
+            const woodColors = walls[selectedWood];
+            
+            if (woodColors) {
+                baseColor = woodColors.baseColor;
+                edgeColor = woodColors.edgeColor;
+                shadowColor = woodColors.shadowColor;
+            }
+        } else {
+            // Use theme-specific colors or fallback to wallType-specific colors
+            const wallColors = walls[wallType] || walls.stone || walls.oakWood;
+            if (wallColors) {
+                baseColor = wallColors.baseColor;
+                edgeColor = wallColors.edgeColor;
+                shadowColor = wallColors.shadowColor;
+            }
         }
 
         // Draw wall with 3D effect
