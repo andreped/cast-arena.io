@@ -253,10 +253,7 @@ export class NetworkSystem {
         const player = this.game.players.get(data.id);
         if (player) {
             player.update({
-                x: data.x,
-                y: data.y,
-                health: data.health,
-                kills: data.kills,
+                ...data, // Use all server data
                 isBurning: false,
                 burnEndTime: 0,
                 isAlive: true,
