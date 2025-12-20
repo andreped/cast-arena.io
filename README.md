@@ -14,12 +14,10 @@ A real-time multiplayer wizard battle arena game where players can join, move ar
 
 ## 🎯 How to Play
 
-- **Move:** Use WASD or Arrow keys to move your wizard around the arena
-- **Cast Spells:** Click or press Space to cast fireballs at your cursor location
-- **Mobile Support:** Touch controls available for mobile devices
-- **Collect Items:** Pick up speed boosts and mana potions scattered around the arena
-- **Battle:** Defeat other players to climb the leaderboard!
-- **Multiplayer:** Share the link with friends - everyone can play together in real-time!
+- **Move:** Use WASD or Arrow keys to move your wizard
+- **Cast Spells:** Click or press Space to cast spells at your cursor
+- **Mobile:** Touch controls available for mobile devices
+- **Objective:** Battle other players and climb the leaderboard!
 
 ## 🛠️ Technology Stack
 
@@ -31,21 +29,13 @@ A real-time multiplayer wizard battle arena game where players can join, move ar
 
 ## 🚀 Features
 
-- ✅ Real-time multiplayer movement
-- ✅ Spell casting system with fireballs
-- ✅ Health and mana systems
-- ✅ Combat with burn effects
-- ✅ Item pickups (speed boosts & mana potions)
-- ✅ Player stats UI with health/mana bars
-- ✅ Active effects display
-- ✅ Leaderboard with kill tracking
-- ✅ Death and respawn mechanics
-- ✅ Beautiful wizard pixel art
-- ✅ Responsive game canvas with minimap
-- ✅ Performance monitoring (FPS/TPS display)
-- ✅ Cross-platform (desktop and mobile controls)
-- 🔄 More spells and abilities (coming soon)
-- 🔄 Team modes (coming soon)
+- ✅ **Real-time multiplayer** - Battle other players live
+- ✅ **Spell combat** - Cast fireballs and Ring of Fire spells
+- ✅ **Smart AI bots** - Play against intelligent opponents
+- ✅ **Tactical movement** - Speed boost by casting behind you
+- ✅ **Kill rewards** - Gain health and mana for each kill
+- ✅ **Power-ups** - Collect speed boosts and mana items
+- ✅ **Mobile friendly** - Works on desktop and mobile devices
 
 ## 🔧 Local Development
 
