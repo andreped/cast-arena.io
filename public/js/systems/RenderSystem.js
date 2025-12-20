@@ -748,9 +748,8 @@ export class RenderSystem {
         this.game.players.forEach(player => {
             if (player.isInViewport(this.game.camera.x, this.game.camera.y)) {
                 this.drawPlayer(player, player.id === this.game.myId);
-                // Only show health bars above other players, not the local player
-                // Mana is private - only show for local player in UI
-                if (player.isAlive && player.id !== this.game.myId) {
+                // Show health bars with names above all players
+                if (player.isAlive) {
                     this.drawHealthBar(player);
                 }
             }
@@ -815,10 +814,7 @@ export class RenderSystem {
 
         this.ctx.restore();
 
-        // Player tag
-        if (isMe) {
-            this.drawPlayerTag(player);
-        }
+        // Player names are now shown above health bars instead of separate tags
     }
 
     drawProtectionAura(player, size) {
@@ -1077,7 +1073,7 @@ export class RenderSystem {
         this.ctx.fillStyle = '#FFFFFF';
         this.ctx.font = '12px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('YOU', player.x, player.y + GAME_CONFIG.player.size + 15);
+        this.ctx.fillText(player.name || player.id, player.x, player.y + GAME_CONFIG.player.size + 15);
     }
 
     drawHealthBar(player) {
@@ -1103,11 +1099,11 @@ export class RenderSystem {
         this.ctx.lineWidth = 1;
         this.ctx.strokeRect(x - width/2, y, width, height);
 
-        // Health text
+        // Player name text
         this.ctx.fillStyle = '#FFF';
         this.ctx.font = '10px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(`${Math.ceil(player.health)}`, x, y - 2);
+        this.ctx.fillText(player.name || player.id, x, y - 6);
 
         // Kill count
         this.ctx.fillStyle = '#FFD700';
