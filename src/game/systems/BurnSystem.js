@@ -124,7 +124,28 @@ class BurnSystem {
             if (player) {
                 const safePosition = this.gameState.getSafeSpawnPosition();
                 const respawnData = player.respawn(safePosition);
-                this.emitRespawnEvents(respawnData);
+                
+                // Emit respawn events (same as SocketManager.emitRespawnEvents)
+                this.io.emit('playerStateUpdate', {
+                    ...respawnData,
+                    isAlive: true
+                });
+                
+                this.io.to(respawnData.id).emit('playerRespawned', {
+                    ...respawnData,
+                    isLocalPlayer: true
+                });
+                
+                this.io.emit('playerRespawned', {
+                    ...respawnData,
+                    isLocalPlayer: false
+                });
+                
+                this.io.emit('forceSyncPlayer', {
+                    ...respawnData,
+                    isBurning: false,
+                    burnEndTime: 0
+                });
             }
         }, gameConfig.player.respawnDelay);
     }

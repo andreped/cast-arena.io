@@ -489,6 +489,36 @@ class BotManager {
                 }
             }
         }
+        
+        // Set up respawn timer (same as other death sources)
+        setTimeout(() => {
+            const safePosition = this.gameState.getSafeSpawnPosition();
+            const respawnData = victim.respawn(safePosition);
+            
+            if (this.io) {
+                // Emit respawn events (same as SocketManager.emitRespawnEvents)
+                this.io.emit('playerStateUpdate', {
+                    ...respawnData,
+                    isAlive: true
+                });
+                
+                this.io.to(respawnData.id).emit('playerRespawned', {
+                    ...respawnData,
+                    isLocalPlayer: true
+                });
+                
+                this.io.emit('playerRespawned', {
+                    ...respawnData,
+                    isLocalPlayer: false
+                });
+                
+                this.io.emit('forceSyncPlayer', {
+                    ...respawnData,
+                    isBurning: false,
+                    burnEndTime: 0
+                });
+            }
+        }, 3000); // 3 second respawn delay to match gameConfig.player.respawnDelay
     }
 }
 
