@@ -32,6 +32,11 @@ class Player {
         
         // Ring of Fire inventory
         this.ringOfFireCharges = 0;
+        
+        // Kill tracking
+        this.lastAttackerId = null; // Who last damaged this player
+        this.lastAttackerTime = 0;   // When the last attack happened
+        this.attackerTimeoutMs = 10000; // 10 seconds to credit kills
     }
 
     getRandomColor() {
@@ -76,14 +81,42 @@ class Player {
         };
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, attackerId = null) {
         if (!this.isAlive || this.spawnProtection) return false;
+        
+        // Track who attacked this player (only if explicitly provided)
+        if (attackerId !== null) {
+            this.lastAttackerId = attackerId;
+            this.lastAttackerTime = Date.now();
+        }
         
         this.health = Math.max(0, this.health - amount);
         if (this.health <= 0) {
             this.isAlive = false;
+            
+            // Handle kill rewards if there's a valid attacker
+            this.handleKillReward();
         }
         return true;
+    }
+    
+    handleKillReward() {
+        // Check if we have a valid recent attacker
+        if (this.lastAttackerId && 
+            Date.now() - this.lastAttackerTime <= this.attackerTimeoutMs) {
+            
+            // Store kill data for the calling system to handle
+            this.lastKillData = {
+                killerId: this.lastAttackerId,
+                victimId: this.id,
+                shouldReward: true
+            };
+            
+            return this.lastKillData;
+        }
+        
+        this.lastKillData = null; // No valid killer
+        return null;
     }
 
     consumeMana(amount) {
@@ -111,6 +144,12 @@ class Player {
         }
         
         return this.mana - oldMana; // Return actual amount restored
+    }
+
+    restoreHealth(amount) {
+        const oldHealth = this.health;
+        this.health = Math.min(this.maxHealth, this.health + amount);
+        return this.health - oldHealth; // Return actual amount restored
     }
 
     updateSpawnProtection() {
