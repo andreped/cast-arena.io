@@ -3,6 +3,7 @@ const gameConfig = require('../../config/gameConfig');
 class Player {
     constructor(id) {
         this.id = id;
+        this.name = this.generatePlayerName(); // Generate a friendly name
         this.x = 0;
         this.y = 0;
         this.color = this.getRandomColor();
@@ -45,6 +46,22 @@ class Player {
 
     getRandomColor() {
         return gameConfig.colors[Math.floor(Math.random() * gameConfig.colors.length)];
+    }
+
+    generatePlayerName() {
+        const adjectives = ['Swift', 'Mighty', 'Wise', 'Brave', 'Noble', 'Fierce', 'Clever', 'Bold', 'Quick', 'Strong'];
+        const nouns = ['Wizard', 'Mage', 'Sorcerer', 'Enchanter', 'Warlock', 'Mystic', 'Arcane', 'Scholar', 'Master', 'Sage'];
+        const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        return `${adjective} ${noun}`;
+    }
+
+    generatePlayerName() {
+        const adjectives = ['Swift', 'Mighty', 'Wise', 'Brave', 'Noble', 'Fierce', 'Clever', 'Bold', 'Quick', 'Strong'];
+        const nouns = ['Wizard', 'Mage', 'Sorcerer', 'Enchanter', 'Warlock', 'Mystic', 'Arcane', 'Scholar', 'Master', 'Sage'];
+        const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        return `${adjective} ${noun}`;
     }
 
     respawn(safePosition = null) {
