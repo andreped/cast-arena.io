@@ -435,18 +435,24 @@ class SocketManager {
         const actualHealthGained = caster.restoreHealth(healthReward);
         const actualManaGained = caster.restoreMana(manaReward);
         
-        // Send health and mana updates to the killer
-        if (actualHealthGained > 0) {
-            this.io.emit('healthUpdate', {
-                id: caster.id,
-                health: caster.health,
-                maxHealth: caster.maxHealth
-            });
-        }
+        // IMMEDIATE health and mana updates to prevent race conditions
+        this.io.emit('healthUpdate', {
+            id: caster.id,
+            health: caster.health,
+            maxHealth: caster.maxHealth
+        });
         
         if (actualManaGained > 0) {
             this.emitManaUpdate(caster);
         }
+        
+        // Force immediate player state update to ensure client sync
+        this.io.emit('playerStateUpdate', {
+            id: caster.id,
+            health: caster.health,
+            mana: caster.mana,
+            isAlive: caster.isAlive
+        });
         
         this.io.to(target.id).emit('playerDied');
         this.io.emit('playerStateUpdate', {

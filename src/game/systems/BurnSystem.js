@@ -91,14 +91,12 @@ class BurnSystem {
                 const actualHealthGained = killer.restoreHealth(healthReward);
                 const actualManaGained = killer.restoreMana(manaReward);
                 
-                // Send health and mana updates to the killer
-                if (actualHealthGained > 0) {
-                    this.io.emit('healthUpdate', {
-                        id: killer.id,
-                        health: killer.health,
-                        maxHealth: killer.maxHealth
-                    });
-                }
+                // IMMEDIATE health and mana updates to prevent race conditions
+                this.io.emit('healthUpdate', {
+                    id: killer.id,
+                    health: killer.health,
+                    maxHealth: killer.maxHealth
+                });
                 
                 if (actualManaGained > 0) {
                     this.io.emit('manaUpdate', {
@@ -107,6 +105,14 @@ class BurnSystem {
                         maxMana: killer.maxMana
                     });
                 }
+                
+                // Force immediate player state update to ensure client sync
+                this.io.emit('playerStateUpdate', {
+                    id: killer.id,
+                    health: killer.health,
+                    mana: killer.mana,
+                    isAlive: killer.isAlive
+                });
                 
                 // Broadcast kill event with rewards (AFTER death events to match player kills)
                 this.io.emit('playerKilled', {
