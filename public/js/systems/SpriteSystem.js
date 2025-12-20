@@ -641,12 +641,14 @@ export class SpriteSystem {
         pixel(-1, -13, hatBorder);
         pixel(1, -13, hatBorder);
 
-        // Magical hat star/emblem (always bright gold)
-        pixel(-1, -15, '#FFD700');
-        pixel(0, -16, '#FFD700');
-        pixel(1, -15, '#FFD700');
-        pixel(0, -14, '#FFD700');
-        pixel(0, -15, '#FFD700');
+        // Magical hat star/emblem (only visible from front, not back)
+        if (pose === 'front' || pose === 'idle' || pose === 'cast') {
+            pixel(-1, -15, '#FFD700');
+            pixel(0, -16, '#FFD700');
+            pixel(1, -15, '#FFD700');
+            pixel(0, -14, '#FFD700');
+            pixel(0, -15, '#FFD700');
+        }
 
         // Face (peach) - same for all directions
         pixel(-4, -12, '#FFDBAC', 2);
@@ -768,27 +770,74 @@ export class SpriteSystem {
         pixel(4, 4, bodyColor, 2);
         pixel(6, 4, bodyColor, 2);
 
-        // Arms - different for each pose
+        // Arms - different for each pose with more detail
         if (pose === 'front') {
-            // Front view: both arms visible at sides
-            pixel(-8, -3, '#FFDBAC');
-            pixel(-7, -3, '#FFDBAC');
-            pixel(6, -3, '#FFDBAC');
-            pixel(7, -3, '#FFDBAC');
+            // Front view: both arms visible at sides, hanging naturally
+            // Left arm (player's left, our right)
+            pixel(-9, -3, '#FFDBAC', 2); // Upper arm
+            pixel(-9, -1, '#FFDBAC', 2);
+            pixel(-10, 1, '#FFDBAC'); // Forearm extending down
+            pixel(-9, 1, '#FFDBAC');
+            pixel(-10, 3, '#FFDBAC'); // Hand
+            pixel(-9, 3, '#FFDBAC');
+            
+            // Right arm (player's right, our left)
+            pixel(7, -3, '#FFDBAC', 2); // Upper arm
+            pixel(7, -1, '#FFDBAC', 2);
+            pixel(8, 1, '#FFDBAC'); // Forearm extending down
+            pixel(9, 1, '#FFDBAC');
+            pixel(8, 3, '#FFDBAC'); // Hand
+            pixel(9, 3, '#FFDBAC');
+            
         } else if (pose === 'back') {
-            // Back view: arms slightly visible at sides
-            pixel(-7, -2, '#FFDBAC');
-            pixel(6, -2, '#FFDBAC');
+            // Back view: arms positioned differently to show we're looking at the back
+            // Arms are attached to body but angled differently than front view
+            // Left arm (from behind, slightly angled outward)
+            pixel(-8, -2, '#FFDBAC'); // Upper arm attached to shoulder
+            pixel(-9, -1, '#FFDBAC');
+            pixel(-9, 0, '#FFDBAC'); // Forearm angled slightly out
+            pixel(-10, 1, '#FFDBAC');
+            pixel(-10, 2, '#FFDBAC'); // Hand area
+            pixel(-9, 3, '#FFDBAC');
+            
+            // Right arm (from behind, slightly angled outward)
+            pixel(6, -2, '#FFDBAC'); // Upper arm attached to shoulder
+            pixel(7, -1, '#FFDBAC');
+            pixel(7, 0, '#FFDBAC'); // Forearm angled slightly out
+            pixel(8, 1, '#FFDBAC');
+            pixel(8, 2, '#FFDBAC'); // Hand area
+            pixel(7, 3, '#FFDBAC');
+            
         } else if (pose === 'cast') {
-            // Side casting: extended arm
-            pixel(6, -6, '#FFDBAC');
+            // Side casting: one arm extended forward holding staff, other at side
+            // Casting arm (extended forward)
+            pixel(7, -6, '#FFDBAC'); // Upper arm
             pixel(8, -6, '#FFDBAC');
-            pixel(10, -6, '#FFDBAC');
-            pixel(-6, -3, '#FFDBAC');
+            pixel(9, -5, '#FFDBAC'); // Forearm
+            pixel(10, -5, '#FFDBAC');
+            pixel(11, -4, '#FFDBAC'); // Hand area (where staff connects)
+            pixel(12, -4, '#FFDBAC');
+            
+            // Support arm (at side, helping with staff)
+            pixel(-7, -4, '#FFDBAC');
+            pixel(-8, -3, '#FFDBAC');
+            pixel(-8, -2, '#FFDBAC');
+            
         } else {
-            // Side idle: arms at sides
-            pixel(-6, -2, '#FFDBAC');
-            pixel(6, -2, '#FFDBAC');
+            // Side idle: arms hanging at sides naturally
+            // Visible arm (facing direction)
+            pixel(7, -3, '#FFDBAC'); // Upper arm
+            pixel(8, -2, '#FFDBAC');
+            pixel(8, -1, '#FFDBAC');
+            pixel(9, 0, '#FFDBAC'); // Forearm
+            pixel(9, 1, '#FFDBAC');
+            pixel(9, 2, '#FFDBAC'); // Hand
+            pixel(8, 3, '#FFDBAC');
+            
+            // Back arm (partially hidden)
+            pixel(-7, -2, '#FFDBAC');
+            pixel(-8, -1, '#FFDBAC');
+            pixel(-8, 1, '#FFDBAC');
         }
     }
 
