@@ -35,19 +35,7 @@ h1 {
     border-radius: 8px;
 }
 
-#gameInfo {
-    position: absolute;
-    top: 10px;
-    right: 20px;
-    font-size: 13px;
-    opacity: 0.8;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 6px 10px;
-    border-radius: 6px;
-    z-index: 100;
-    max-width: 200px;
-    text-align: right;
-}
+
 
 #gameArea {
     position: relative;
@@ -374,6 +362,7 @@ h1 {
     border: 2px solid #34495e;
     border-radius: 8px;
     padding: 8px;
+    z-index: 100;
 }
 
 /* Player Stats UI */
@@ -476,6 +465,14 @@ h1 {
     text-align: center;
     margin-top: 4px;
     font-weight: bold;
+}
+
+#playerCount {
+    color: white;
+    font-size: 9px;
+    text-align: center;
+    margin-top: 2px;
+    opacity: 0.8;
 }
 
 .death-modal {
