@@ -37,6 +37,10 @@ class Player {
         this.lastAttackerId = null; // Who last damaged this player
         this.lastAttackerTime = 0;   // When the last attack happened
         this.attackerTimeoutMs = 10000; // 10 seconds to credit kills
+        
+        // Tactical movement boost
+        this.tacticalBoostActive = false;
+        this.tacticalBoostEndTime = 0;
     }
 
     getRandomColor() {
@@ -304,6 +308,43 @@ class Player {
             // Recoil was causing the wall walking issue!
             // Do not add any recoil velocity to bots
         } else {
+            // Check if tactical boost should expire
+            if (this.tacticalBoostActive && Date.now() > this.tacticalBoostEndTime) {
+                this.tacticalBoostActive = false;
+            }
+            
+            // Check if player is casting in opposite direction for speed boost
+            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+            
+            if (currentSpeed > 20 && !this.tacticalBoostActive) { // Prevent stacking boosts
+                // Calculate player's current movement direction
+                const movementAngle = Math.atan2(this.velocityY, this.velocityX);
+                
+                // Calculate angle difference between movement and spell direction
+                let angleDiff = Math.abs(movementAngle - angle);
+                if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff; // Normalize to 0-π
+                
+                // If casting roughly opposite to movement direction (within 45° of opposite)
+                const oppositeThreshold = Math.PI * 0.75; // 135 degrees (π - π/4)
+                if (angleDiff >= oppositeThreshold) {
+                    // Grant very modest speed boost to prevent going supersonic
+                    const tacticalBoostMultiplier = 1.1; // Just 10% extra - subtle but useful
+                    const boostedRecoilX = recoilX * tacticalBoostMultiplier;
+                    const boostedRecoilY = recoilY * tacticalBoostMultiplier;
+                    
+                    // Apply the boost directly without speed limits
+                    this.velocityX += boostedRecoilX;
+                    this.velocityY += boostedRecoilY;
+                    
+                    // Activate boost flag to prevent stacking
+                    this.tacticalBoostActive = true;
+                    this.tacticalBoostEndTime = Date.now() + 500;
+                    
+                    console.log(`Player ${this.id} got tactical speed boost! Old speed: ${currentSpeed.toFixed(1)}, New speed: ${Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY).toFixed(1)}`);
+                    return; // Exit early, we've applied the boosted recoil
+                }
+            }
+            
             // Normal recoil for human players
             this.velocityX += recoilX;
             this.velocityY += recoilY;

@@ -41,6 +41,10 @@ export class Player {
         this.acceleration = data.acceleration || GAME_CONFIG.player.acceleration || 800; // pixels per second²
         this.deceleration = data.deceleration || GAME_CONFIG.player.deceleration || 1200; // pixels per second²
         this.airResistance = data.airResistance || GAME_CONFIG.player.airResistance || 0.85; // friction when no input
+        
+        // Tactical movement boost system
+        this.tacticalBoostActive = false;
+        this.tacticalBoostEndTime = 0;
     }
 
     update(data) {
@@ -112,9 +116,14 @@ export class Player {
             }
         }
         
-        // Cap velocity to max speed
+        // Check if tactical boost should expire
+        if (this.tacticalBoostActive && Date.now() > this.tacticalBoostEndTime) {
+            this.tacticalBoostActive = false;
+        }
+        
+        // Cap velocity to max speed (unless tactical boost is active)
         const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-        if (currentSpeed > this.maxVelocity) {
+        if (!this.tacticalBoostActive && currentSpeed > this.maxVelocity) {
             const scale = this.maxVelocity / currentSpeed;
             this.velocityX *= scale;
             this.velocityY *= scale;
@@ -148,8 +157,44 @@ export class Player {
     applyRecoil(angle, force) {
         // Apply recoil force in the opposite direction of the spell
         const recoilAngle = angle + Math.PI;
-        this.velocityX += Math.cos(recoilAngle) * force;
-        this.velocityY += Math.sin(recoilAngle) * force;
+        const recoilX = Math.cos(recoilAngle) * force;
+        const recoilY = Math.sin(recoilAngle) * force;
+        
+        // Check if player is casting in opposite direction for speed boost
+        const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+        
+        if (currentSpeed > 20 && !this.tacticalBoostActive) { // Prevent stacking boosts
+            // Calculate player's current movement direction
+            const movementAngle = Math.atan2(this.velocityY, this.velocityX);
+            
+            // Calculate angle difference between movement and spell direction
+            let angleDiff = Math.abs(movementAngle - angle);
+            if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff; // Normalize to 0-π
+            
+            // If casting roughly opposite to movement direction (within 45° of opposite)
+            const oppositeThreshold = Math.PI * 0.75; // 135 degrees (π - π/4)
+            if (angleDiff >= oppositeThreshold) {
+                // Grant very modest speed boost to prevent going supersonic
+                const tacticalBoostMultiplier = 1.1; // Just 10% extra - subtle but useful
+                const boostedRecoilX = recoilX * tacticalBoostMultiplier;
+                const boostedRecoilY = recoilY * tacticalBoostMultiplier;
+                
+                // Apply the boost directly without speed limits
+                this.velocityX += boostedRecoilX;
+                this.velocityY += boostedRecoilY;
+                
+                // Activate tactical boost to prevent speed limiting briefly
+                this.tacticalBoostActive = true;
+                this.tacticalBoostEndTime = Date.now() + 500; // 0.5 second boost duration
+                
+                console.log(`Tactical speed boost activated! Speed: ${Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY).toFixed(1)}`);
+                return; // Exit early, we've applied the boosted recoil
+            }
+        }
+        
+        // Normal recoil
+        this.velocityX += recoilX;
+        this.velocityY += recoilY;
     }
 
     setFacing(direction) {
