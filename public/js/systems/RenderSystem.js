@@ -860,11 +860,12 @@ export class RenderSystem {
         // Position and scale
         const scale = 2; // Scale up pixel art for better visibility
         
-        // Move to player position
-        this.ctx.translate(player.x, player.y);
-        
-        // Detect if player is moving for leg animation
+        // Detect if player is moving for leg animation and bounce effect
         const isMoving = this.isPlayerMoving(player);
+        const bounceOffset = this.getBounceOffset(player, isMoving);
+        
+        // Move to player position with bounce offset
+        this.ctx.translate(player.x, player.y + bounceOffset);
         
         // Draw legs first (bottom layer) - positioned below the body
         const legSprite = this.spriteSystem.getLegSprite(direction, player.color, isMoving, player.id);
@@ -1005,6 +1006,38 @@ export class RenderSystem {
         
         // Consider moving if traveled significant distance recently
         return distance > 1 && timeDiff < moveThreshold;
+    }
+
+    getBounceOffset(player, isMoving) {
+        const currentTime = Date.now();
+        
+        if (isMoving) {
+            // Walking bounce - faster and more pronounced
+            const walkBounceSpeed = 0.008; // Faster bounce when walking
+            const walkBounceAmplitude = 2.5; // Slightly larger bounce amplitude
+            
+            // Use player ID to offset the phase so all players don't bounce in sync
+            const phaseOffset = (player.id ? player.id.charCodeAt(0) * 0.1 : 0);
+            
+            // Create a bouncing effect that matches walking rhythm
+            // Use abs(sin) to create double-bounce per cycle (like footsteps)
+            const walkCycle = Math.sin((currentTime * walkBounceSpeed) + phaseOffset);
+            const bounce = Math.abs(walkCycle) * walkBounceAmplitude;
+            
+            return bounce;
+        } else {
+            // Idle bounce - slower and gentler
+            const bounceSpeed = 0.002; // Slow, gentle bounce
+            const bounceAmplitude = 1.5; // Small bounce amplitude (1.5 pixels)
+            
+            // Use player ID to offset the phase so all players don't bounce in sync
+            const phaseOffset = (player.id ? player.id.charCodeAt(0) * 0.1 : 0);
+            
+            // Sine wave for smooth breathing motion
+            const bounce = Math.sin((currentTime * bounceSpeed) + phaseOffset) * bounceAmplitude;
+            
+            return bounce;
+        }
     }
 
     drawPlayerTag(player) {
