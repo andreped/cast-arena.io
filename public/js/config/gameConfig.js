@@ -43,7 +43,7 @@ export const GAME_CONFIG = {
         opacity: 0.1
     },
     themes: {
-        current: Math.random() > 0.5 ? 'fortress' : 'woods', // Randomly select theme at start
+        current: Math.random() > 0.66 ? 'fortress' : (Math.random() > 0.5 ? 'woods' : 'winter'), // Randomly select theme at start
         fortress: {
             name: 'Fortress',
             description: 'Ancient stone fortress with gray walls',
@@ -154,6 +154,66 @@ export const GAME_CONFIG = {
                         baseColor: '#654321',
                         variants: ['#5d3c1e', '#7a4f24', '#583218'],
                         weight: 0.05
+                    }
+                }
+            }
+        },
+        winter: {
+            name: 'Frozen Wasteland',
+            description: 'Icy battlefield with snow and frozen wood',
+            background: 'linear-gradient(45deg, #2c5aa0, #87ceeb)',
+            worldBoundaryColor: '#1e3a5f',
+            gridColor: 'rgba(173, 216, 230, 0.2)',
+            walls: {
+                // Dark wood types for winter theme
+                frozenOak: {
+                    baseColor: '#4A4A4A',
+                    edgeColor: '#5A5A5A',
+                    shadowColor: '#2A2A2A'
+                },
+                darkWood: {
+                    baseColor: '#3C3C3C',
+                    edgeColor: '#4D4D4D',
+                    shadowColor: '#1C1C1C'
+                },
+                weatheredWood: {
+                    baseColor: '#555555',
+                    edgeColor: '#666666',
+                    shadowColor: '#333333'
+                },
+                iceWood: {
+                    baseColor: '#6B7B8C',
+                    edgeColor: '#7B8B9C',
+                    shadowColor: '#4B5B6C'
+                },
+                perimeter: {
+                    baseColor: '#1C3A5C',
+                    edgeColor: '#2C4A6C',
+                    shadowColor: '#0C2A4C'
+                }
+            },
+            floor: {
+                tileSize: 20,
+                patterns: {
+                    freshSnow: {
+                        baseColor: '#FFFFFF',
+                        variants: ['#FEFEFE', '#FFFFFF', '#F8F8FF'],
+                        weight: 0.4
+                    },
+                    deepSnow: {
+                        baseColor: '#F0F8FF',
+                        variants: ['#E6F3FF', '#F5FAFF', '#DDEEFF'],
+                        weight: 0.3
+                    },
+                    ice: {
+                        baseColor: '#B0E0E6',
+                        variants: ['#87CEEB', '#B0C4DE', '#ADD8E6'],
+                        weight: 0.2
+                    },
+                    packedSnow: {
+                        baseColor: '#E0E8F0',
+                        variants: ['#D5DDE5', '#C8D0D8', '#BEBEBE'],
+                        weight: 0.1
                     }
                 }
             }

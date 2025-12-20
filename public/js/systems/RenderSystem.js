@@ -247,9 +247,23 @@ export class RenderSystem {
                 edgeColor = woodColors.edgeColor;
                 shadowColor = woodColors.shadowColor;
             }
+        } else if (GAME_CONFIG.themes.current === 'winter' && wallType !== 'perimeter') {
+            // Winter theme with dark frozen wood varieties
+            const seed = x * 73 + y * 37 + width * 17 + height * 23;
+            const rand = this.seededRandom(seed);
+            
+            const woodTypes = ['frozenOak', 'darkWood', 'weatheredWood', 'iceWood'];
+            const selectedWood = woodTypes[Math.floor(rand * woodTypes.length)];
+            const woodColors = walls[selectedWood];
+            
+            if (woodColors) {
+                baseColor = woodColors.baseColor;
+                edgeColor = woodColors.edgeColor;
+                shadowColor = woodColors.shadowColor;
+            }
         } else {
             // Use theme-specific colors or fallback to wallType-specific colors
-            const wallColors = walls[wallType] || walls.stone || walls.oakWood;
+            const wallColors = walls[wallType] || walls.stone || walls.oakWood || walls.frozenOak;
             if (wallColors) {
                 baseColor = wallColors.baseColor;
                 edgeColor = wallColors.edgeColor;
