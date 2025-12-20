@@ -21,6 +21,7 @@ export class NetworkSystem {
         this.socket.on('newPlayer', this.handleNewPlayer.bind(this));
         this.socket.on('playerMoved', this.handlePlayerMoved.bind(this));
         this.socket.on('playerAimed', this.handlePlayerAimed.bind(this));
+        this.socket.on('playerNameUpdated', this.handlePlayerNameUpdated.bind(this));
         this.socket.on('playerPositionUpdate', this.handlePlayerPositionUpdate.bind(this));
         this.socket.on('forceSyncPlayer', this.handleForceSyncPlayer.bind(this));
         this.socket.on('playerDisconnected', this.handlePlayerDisconnected.bind(this));
@@ -163,6 +164,69 @@ export class NetworkSystem {
                 player.aimingAngle = data.aimingAngle;
             }
         }
+    }
+
+    handlePlayerNameUpdated(data) {
+        const player = this.game.players.get(data.id);
+        if (player) {
+            const oldName = player.name;
+            player.name = data.name;
+            console.log(`Player ${data.id} changed name to: ${data.name}`);
+            
+            // If this is the local player and the name was modified (collision detected)
+            if (data.id === this.game.myId && data.name !== this.game.playerName) {
+                console.log(`Name collision detected! Your name was changed from '${this.game.playerName}' to '${data.name}'`);
+                
+                // Update the stored name and input field
+                localStorage.setItem('castArenaPlayerName', data.name);
+                this.game.playerName = data.name;
+                
+                // Update name change input if it exists
+                const nameChangeInput = document.getElementById('nameChangeInput');
+                if (nameChangeInput) {
+                    nameChangeInput.value = data.name;
+                }
+                
+                // Show notification about name change
+                this.showNameCollisionNotification(data.name);
+            }
+            
+            // Update leaderboard to show new name
+            this.game.ui.updateLeaderboard();
+        }
+    }
+    
+    showNameCollisionNotification(newName) {
+        // Create a temporary notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(231, 76, 60, 0.95);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 3000;
+            border: 2px solid #c0392b;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        `;
+        notification.innerHTML = `
+            🚨 Name collision detected!<br>
+            Your name was changed to: <strong>${newName}</strong>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 4 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 4000);
     }
 
     handlePlayerPositionUpdate(data) {

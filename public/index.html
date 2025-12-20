@@ -71,6 +71,25 @@
         </div>
     </div>
 
+    <!-- Welcome Modal -->
+    <div id="welcomeModal" class="modal welcome-modal">
+        <div class="modal-content welcome-content">
+            <h1>🧙‍♂️ Welcome to Cast Arena!</h1>
+            <div class="welcome-section">
+                <h3>Choose Your Wizard Name</h3>
+                <input type="text" id="playerNameInput" placeholder="Enter your wizard name..." maxlength="20" autocomplete="off">
+                <p class="name-hint">Your name doesn't need to be unique - it's just how others will see you in the arena!</p>
+            </div>
+            <div class="welcome-section">
+                <h3>🎮 Controls</h3>
+                <p><strong>Desktop:</strong> WASD to move, Click/Space to cast fireballs</p>
+                <p><strong>Mobile:</strong> Use touch joystick and fire button</p>
+                <p><strong>ESC:</strong> Open leaderboard and settings</p>
+            </div>
+            <button id="startGameBtn" class="start-game-btn">⚡ Enter the Arena ⚡</button>
+        </div>
+    </div>
+
     <!-- Death Modal -->
     <div id="deathModal" class="modal">
         <div class="modal-content death-modal">
@@ -94,6 +113,14 @@
             </div>
             
             <div id="settingsPanel" class="tab-panel">
+                <div class="settings-section">
+                    <h3>👤 Player Settings</h3>
+                    <div class="name-change-control">
+                        <label>Your Name:</label>
+                        <input type="text" id="nameChangeInput" placeholder="Enter new name..." maxlength="20">
+                        <button id="changeNameBtn" class="change-name-btn">Update Name</button>
+                    </div>
+                </div>
                 <div class="settings-section">
                     <h3>🔊 Audio Controls</h3>
                     <div class="audio-control">

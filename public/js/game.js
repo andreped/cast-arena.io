@@ -57,12 +57,14 @@ export class Game {
             y: 0
         };
         
-        // Initialize systems
-        this.network = new NetworkSystem(this);
+        // Initialize systems (but delay network until name is set)
         this.input = new InputSystem(this);
         this.renderer = new RenderSystem(this);
         this.audio = new AudioSystem();
         this.ui = new UISystem(this);
+        
+        // Player name - will be set from welcome modal
+        this.playerName = null;
         
         // Load audio assets asynchronously
         this.initializeAudio();
@@ -547,6 +549,17 @@ export class Game {
             }
         }
     }
+
+    // Start network connection with player name
+    startNetworkWithName(playerName) {
+        this.playerName = playerName;
+        this.network = new NetworkSystem(this);
+        
+        // Send player name to server
+        if (this.network && this.network.socket) {
+            this.network.socket.emit('setPlayerName', { name: playerName });
+        }
+    }
 }
 
 // Store game instance for cleanup
@@ -566,11 +579,80 @@ window.switchTheme = function(themeName) {
 
 // Start the game when the window loads
 window.addEventListener('load', () => {
-    // Cleanup existing instance if any
+    // Show welcome modal instead of starting game immediately
+    showWelcomeModal();
+});
+
+// Welcome modal functions
+function showWelcomeModal() {
+    // Check if we have a stored name
+    const storedName = localStorage.getItem('castArenaPlayerName');
+    if (storedName) {
+        // Skip modal and start game directly with stored name
+        startGameWithName(storedName);
+        return;
+    }
+    
+    const modal = document.getElementById('welcomeModal');
+    const nameInput = document.getElementById('playerNameInput');
+    const startBtn = document.getElementById('startGameBtn');
+    
+    if (modal && nameInput && startBtn) {
+        modal.style.display = 'block';
+        
+        // Focus on name input
+        setTimeout(() => nameInput.focus(), 100);
+        
+        // Handle start game button
+        startBtn.addEventListener('click', startGame);
+        
+        // Handle enter key in name input
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                startGame();
+            }
+        });
+        
+        // Auto-generate a name as placeholder
+        const adjectives = ['Swift', 'Mighty', 'Wise', 'Brave', 'Noble', 'Fierce', 'Clever', 'Bold', 'Quick', 'Strong'];
+        const nouns = ['Wizard', 'Mage', 'Sorcerer', 'Enchanter', 'Warlock', 'Mystic', 'Arcane', 'Scholar', 'Master', 'Sage'];
+        const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        nameInput.placeholder = `e.g. ${adjective} ${noun}`;
+    }
+}
+
+function startGame() {
+    const nameInput = document.getElementById('playerNameInput');
+    const modal = document.getElementById('welcomeModal');
+    
+    let playerName = nameInput.value.trim();
+    
+    // If no name provided, generate one
+    if (!playerName) {
+        const adjectives = ['Swift', 'Mighty', 'Wise', 'Brave', 'Noble', 'Fierce', 'Clever', 'Bold', 'Quick', 'Strong'];
+        const nouns = ['Wizard', 'Mage', 'Sorcerer', 'Enchanter', 'Warlock', 'Mystic', 'Arcane', 'Scholar', 'Master', 'Sage'];
+        const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        playerName = `${adjective} ${noun}`;
+    }
+    
+    // Hide modal
+    modal.style.display = 'none';
+    
+    startGameWithName(playerName);
+}
+
+function startGameWithName(playerName) {
+    // Store name in localStorage
+    localStorage.setItem('castArenaPlayerName', playerName);
+    
+    // Start the game
     if (gameInstance) {
         gameInstance.destroy();
     }
     gameInstance = new Game();
+    gameInstance.startNetworkWithName(playerName);
     
     // Update page title with current theme
     const currentTheme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
@@ -579,7 +661,13 @@ window.addEventListener('load', () => {
     // Log theme info
     console.log(`🎨 Current theme: ${currentTheme.name}`);
     console.log('💡 Switch themes by typing: switchTheme("fortress") or switchTheme("woods")');
-});
+    
+    // Update the name change input in settings if it exists
+    const nameChangeInput = document.getElementById('nameChangeInput');
+    if (nameChangeInput) {
+        nameChangeInput.value = playerName;
+    }
+}
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
