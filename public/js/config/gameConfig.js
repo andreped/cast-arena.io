@@ -9,8 +9,8 @@ export const GAME_CONFIG = {
         maxHeight: 1080 // Maximum viewport height for fairness
     },
     world: {
-        width: 800 * 3,
-        height: 600 * 3,
+        width: 800 * 4.5,  // Increased by 50% (was 800 * 3 = 2400, now 3600)
+        height: 600 * 4.5, // Increased by 50% (was 600 * 3 = 1800, now 2700)
         viewportPadding: 100
     },
     player: {

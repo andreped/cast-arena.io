@@ -13,20 +13,20 @@ class ItemSystem {
         // Item type configurations - easily extendable for future items
         this.itemConfigs = {
             speed: {
-                maxItems: 8,
-                spawnInterval: 5000, // 5 seconds for testing (was 15000)
+                maxItems: 12,
+                spawnInterval: 5000, // 5 seconds for testing
                 entityClass: SpeedItem,
                 lastSpawnTime: 0
             },
             mana: {
-                maxItems: 4, // Rarer than speed items
-                spawnInterval: 5000, // Same spawn frequency as speed items
+                maxItems: 5, // Rarer than speed items
+                spawnInterval: 5000,
                 entityClass: ManaItem,
                 lastSpawnTime: 0
             },
             ringOfFire: {
-                maxItems: 2, // Very rare - only 2 at a time
-                spawnInterval: 10000, // Temporarily reduced to 10 seconds for testing
+                maxItems: 3, // Very rare - only 2 at a time
+                spawnInterval: 5000,
                 entityClass: RingOfFireItem,
                 lastSpawnTime: 0
             }

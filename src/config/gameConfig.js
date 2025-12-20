@@ -1,7 +1,7 @@
 const gameConfig = {
     world: {
-        width: 800 * 3,
-        height: 600 * 3
+        width: 800 * 4.5,  // Increased by 50% (was 800 * 3 = 2400, now 3600)
+        height: 600 * 4.5  // Increased by 50% (was 600 * 3 = 1800, now 2700)
     },
     player: {
         maxHealth: 100,
@@ -32,7 +32,7 @@ const gameConfig = {
     colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'],
     bots: {
         enabled: true,
-        count: 5, // Number of bots in game
+        count: 8, // Number of bots in game
         
         // Easy AI settings
         visionRange: 400,        // How far bots can see

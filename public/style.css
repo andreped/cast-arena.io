@@ -91,10 +91,17 @@ h1 {
     max-width: 400px;
     background: rgba(0, 0, 0, 0.9);
     padding: 20px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 #leaderboardContent {
     margin-top: 20px;
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: 60vh;
 }
 
 .leaderboard-row {
@@ -162,13 +169,18 @@ h1 {
 
 .modal-content {
     background: linear-gradient(135deg, #2c3e50, #4a6741);
-    margin: 10% auto;
+    margin: 5% auto;
     padding: 30px;
     border: 3px solid #34495e;
     border-radius: 15px;
     width: 450px;
+    max-width: 90vw;
+    max-height: 90vh;
     text-align: center;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .modal-content h2 {
