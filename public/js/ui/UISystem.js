@@ -543,10 +543,41 @@ export class UISystem {
 
     showDeathModal() {
         document.getElementById('deathModal').style.display = 'block';
+        this.startRespawnCountdown();
+    }
+
+    startRespawnCountdown() {
+        const respawnTimer = document.getElementById('respawnTimer');
+        let timeLeft = 3; // 3 seconds respawn delay
+        
+        // Clear any existing countdown
+        if (this.respawnCountdownInterval) {
+            clearInterval(this.respawnCountdownInterval);
+        }
+        
+        // Update timer immediately
+        respawnTimer.textContent = timeLeft;
+        
+        // Start countdown
+        this.respawnCountdownInterval = setInterval(() => {
+            timeLeft--;
+            respawnTimer.textContent = timeLeft;
+            
+            if (timeLeft <= 0) {
+                clearInterval(this.respawnCountdownInterval);
+                this.respawnCountdownInterval = null;
+            }
+        }, 1000);
     }
 
     hideDeathModal() {
         document.getElementById('deathModal').style.display = 'none';
+        
+        // Clear countdown when hiding modal
+        if (this.respawnCountdownInterval) {
+            clearInterval(this.respawnCountdownInterval);
+            this.respawnCountdownInterval = null;
+        }
     }
 
     updatePlayerCount() {
