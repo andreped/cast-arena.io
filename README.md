@@ -8,7 +8,7 @@ A real-time multiplayer wizard battle arena game where players can join, move ar
 
 *Note: The server may take 30-60 seconds to wake up if it's been inactive.*
 
-<img src="docs/assets/gameplay-snapshot.png" alt="Cast Arena Gameplay" width="600">
+<img src="docs/assets/gameplay-snapshot-dec2025.png" alt="Cast Arena Gameplay" width="600">
 
 *Live multiplayer wizard battles with spells, items, and real-time combat!*
 
