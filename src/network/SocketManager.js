@@ -280,7 +280,7 @@ class SocketManager {
                     
                     // Apply damage
                     const damage = 80;
-                    const actualDamage = player.takeDamage(damage);
+                    const actualDamage = player.takeDamage(damage, ringOfFire.casterId);
                     
                     if (actualDamage) {
                         playersHit.add(playerId); // Mark as hit to prevent multiple hits
@@ -296,9 +296,7 @@ class SocketManager {
                         // Check if player died
                         if (player.health <= 0) {
                             const caster = this.gameState.getPlayer(ringOfFire.casterId);
-                            if (caster) {
-                                this.handlePlayerDeath(player, caster);
-                            }
+                            this.handlePlayerDeath(player, caster);
                         }
                     }
                 }
@@ -398,7 +396,7 @@ class SocketManager {
             return;
         }
 
-        if (target.takeDamage(spell.damage)) {
+        if (target.takeDamage(spell.damage, caster.id)) {
             this.gameState.applyBurnEffect(targetId);
             this.gameState.removeSpell(spellId);
 
@@ -430,6 +428,26 @@ class SocketManager {
     handlePlayerDeath(target, caster) {
         caster.kills++;
         
+        // Grant kill rewards to the caster
+        const healthReward = 35;
+        const manaReward = 15;
+        
+        const actualHealthGained = caster.restoreHealth(healthReward);
+        const actualManaGained = caster.restoreMana(manaReward);
+        
+        // Send health and mana updates to the killer
+        if (actualHealthGained > 0) {
+            this.io.emit('healthUpdate', {
+                id: caster.id,
+                health: caster.health,
+                maxHealth: caster.maxHealth
+            });
+        }
+        
+        if (actualManaGained > 0) {
+            this.emitManaUpdate(caster);
+        }
+        
         this.io.to(target.id).emit('playerDied');
         this.io.emit('playerStateUpdate', {
             id: target.id,
@@ -440,7 +458,9 @@ class SocketManager {
         this.io.emit('playerKilled', {
             killerId: caster.id,
             victimId: target.id,
-            killerKills: caster.kills
+            killerKills: caster.kills,
+            healthGained: actualHealthGained,
+            manaGained: actualManaGained
         });
 
         setTimeout(() => {

@@ -407,7 +407,7 @@ class BotManager {
                     
                     // Apply damage
                     const damage = 80;
-                    const actualDamage = player.takeDamage(damage);
+                    const actualDamage = player.takeDamage(damage, ringOfFire.playerId);
                     
                     if (actualDamage) {
                         playersHit.add(playerId); // Mark as hit to prevent multiple hits
@@ -423,13 +423,7 @@ class BotManager {
                         
                         // Check if player died
                         if (player.health <= 0) {
-                            player.isAlive = false;
-                            if (this.io) {
-                                this.io.emit('playerDied', { 
-                                    id: playerId,
-                                    killerId: ringOfFire.playerId 
-                                });
-                            }
+                            this.handlePlayerDeathFromDamage(player);
                         }
                     }
                 }
@@ -440,6 +434,61 @@ class BotManager {
                 clearInterval(expansionInterval);
             }
         }, damageInterval);
+    }
+    
+    // Centralized kill handling for bot actions
+    handlePlayerDeathFromDamage(victim) {
+        const killData = victim.lastKillData;
+        
+        if (this.io) {
+            this.io.to(victim.id).emit('playerDied');
+            this.io.emit('playerStateUpdate', {
+                id: victim.id,
+                isAlive: false,
+                health: 0
+            });
+        }
+        
+        if (killData && killData.shouldReward) {
+            const killer = this.gameState.getPlayer(killData.killerId);
+            if (killer && killer.isAlive) {
+                // Grant kill rewards
+                killer.kills = (killer.kills || 0) + 1;
+                
+                const healthReward = 35;
+                const manaReward = 15;
+                
+                const actualHealthGained = killer.restoreHealth(healthReward);
+                const actualManaGained = killer.restoreMana(manaReward);
+                
+                // Send updates to the killer
+                if (this.io) {
+                    if (actualHealthGained > 0) {
+                        this.io.emit('healthUpdate', {
+                            id: killer.id,
+                            health: killer.health,
+                            maxHealth: killer.maxHealth
+                        });
+                    }
+                    
+                    if (actualManaGained > 0) {
+                        this.io.emit('manaUpdate', {
+                            id: killer.id,
+                            mana: killer.mana,
+                            maxMana: killer.maxMana
+                        });
+                    }
+                    
+                    this.io.emit('playerKilled', {
+                        killerId: killer.id,
+                        victimId: victim.id,
+                        killerKills: killer.kills,
+                        healthGained: actualHealthGained,
+                        manaGained: actualManaGained
+                    });
+                }
+            }
+        }
     }
 }
 
