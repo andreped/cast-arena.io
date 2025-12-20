@@ -463,13 +463,12 @@ class BotManager {
                 
                 // Send updates to the killer
                 if (this.io) {
-                    if (actualHealthGained > 0) {
-                        this.io.emit('healthUpdate', {
-                            id: killer.id,
-                            health: killer.health,
-                            maxHealth: killer.maxHealth
-                        });
-                    }
+                    // IMMEDIATE health and mana updates to prevent race conditions
+                    this.io.emit('healthUpdate', {
+                        id: killer.id,
+                        health: killer.health,
+                        maxHealth: killer.maxHealth
+                    });
                     
                     if (actualManaGained > 0) {
                         this.io.emit('manaUpdate', {
@@ -478,6 +477,14 @@ class BotManager {
                             maxMana: killer.maxMana
                         });
                     }
+                    
+                    // Force immediate player state update to ensure client sync
+                    this.io.emit('playerStateUpdate', {
+                        id: killer.id,
+                        health: killer.health,
+                        mana: killer.mana,
+                        isAlive: killer.isAlive
+                    });
                     
                     this.io.emit('playerKilled', {
                         killerId: killer.id,
