@@ -45,21 +45,21 @@ class WallSystem {
         
         const wallConfigs = [
             // Line walls - more and varied sizes
-            { type: 'line', count: 12, minLength: 80, maxLength: 280 },
+            { type: 'line', count: 18, minLength: 80, maxLength: 280 },
             // L-shaped walls - more complex structures
-            { type: 'L', count: 8, minLength: 80, maxLength: 200 },
+            { type: 'L', count: 12, minLength: 80, maxLength: 200 },
             // House-like structures - more complete buildings
-            { type: 'house', count: 6, minSize: 120, maxSize: 220 },
+            { type: 'house', count: 9, minSize: 120, maxSize: 220 },
             // Window walls - varied openings
-            { type: 'window', count: 8, minLength: 100, maxLength: 300 },
+            { type: 'window', count: 12, minLength: 100, maxLength: 300 },
             // New: Cross-shaped intersections
-            { type: 'cross', count: 4, minSize: 100, maxSize: 180 },
+            { type: 'cross', count: 6, minSize: 100, maxSize: 180 },
             // New: Maze-like corridors
-            { type: 'corridor', count: 6, minLength: 150, maxLength: 250 },
+            { type: 'corridor', count: 9, minLength: 150, maxLength: 250 },
             // New: Fortress-like structures
-            { type: 'fortress', count: 3, minSize: 180, maxSize: 280 },
+            { type: 'fortress', count: 5, minSize: 180, maxSize: 280 },
             // New: Small rooms/chambers
-            { type: 'room', count: 10, minSize: 60, maxSize: 120 }
+            { type: 'room', count: 15, minSize: 60, maxSize: 120 }
         ];
 
         wallConfigs.forEach(config => {
@@ -76,8 +76,9 @@ class WallSystem {
         while (attempts < maxAttempts) {
             attempts++;
             
-            const x = this.seededRandom() * (world.width - 200) + 100;
-            const y = this.seededRandom() * (world.height - 200) + 100;
+            const margin = Math.min(world.width, world.height) * 0.05; // 5% of smaller dimension
+            const x = this.seededRandom() * (world.width - margin * 2) + margin;
+            const y = this.seededRandom() * (world.height - margin * 2) + margin;
             
             // Check distance from center spawn area
             const centerX = world.width / 2;
