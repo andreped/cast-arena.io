@@ -38,6 +38,9 @@ class SocketManager {
         const wallData = this.gameState.getWallState();
         socket.emit('wallData', wallData);
         
+        // Send theme configuration to client
+        socket.emit('themeConfig', { theme: gameConfig.theme.current });
+        
         socket.emit('itemsUpdate', this.gameState.getItemsState());
         socket.broadcast.emit('newPlayer', player.toJSON());
         

@@ -17,6 +17,7 @@ export class NetworkSystem {
 
         this.socket.on('currentPlayers', this.handleCurrentPlayers.bind(this));
         this.socket.on('wallData', this.handleWallData.bind(this));
+        this.socket.on('themeConfig', this.handleThemeConfig.bind(this));
         this.socket.on('newPlayer', this.handleNewPlayer.bind(this));
         this.socket.on('playerMoved', this.handlePlayerMoved.bind(this));
         this.socket.on('playerAimed', this.handlePlayerAimed.bind(this));
@@ -65,6 +66,12 @@ export class NetworkSystem {
     handleWallData(wallData) {
         this.game.setWalls(wallData);
         console.log('Received wall data:', Object.keys(wallData).length, 'walls');
+    }
+
+    handleThemeConfig(data) {
+        // Set the server-determined theme
+        console.log('Received theme from server:', data.theme);
+        this.game.setTheme(data.theme);
     }
 
     handleItemsUpdate(itemsData) {

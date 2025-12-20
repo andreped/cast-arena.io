@@ -20,6 +20,9 @@ export class Game {
         // Set up dynamic viewport
         this.setupDynamicViewport();
         
+        // Theme will be set when server sends it via NetworkSystem
+        // this.applyTheme(GAME_CONFIG.themes.current); -- Removed to prevent client-side theme
+        
         // Make canvas focusable and auto-focus for immediate keyboard input
         this.canvas.setAttribute('tabindex', '0');
         this.canvas.focus();
@@ -223,6 +226,44 @@ export class Game {
         this.canvas = null;
         this.minimapCanvas = null;
         this.renderer = null;
+    }
+
+    // Apply theme styling
+    applyTheme(themeName) {
+        const theme = GAME_CONFIG.themes[themeName];
+        if (!theme) return;
+        
+        // Update canvas background
+        this.canvas.style.background = theme.background;
+        
+        // Update current theme
+        GAME_CONFIG.themes.current = themeName;
+        
+        // Regenerate floor seed to get new pattern with theme colors
+        GAME_CONFIG.floor.seed = Math.floor(Math.random() * 1000000);
+        
+        console.log(`Applied theme: ${theme.name}`);
+    }
+
+    // Switch to a different theme
+    switchTheme(themeName) {
+        this.applyTheme(themeName);
+        // Reinitialize floor with new theme patterns
+        if (this.renderer) {
+            this.renderer.initializeFloor();
+            this.renderer.render();
+        }
+    }
+
+    // Set theme from server (for synchronized themes across all players)
+    setTheme(themeName) {
+        console.log(`Setting server-synchronized theme: ${themeName}`);
+        this.applyTheme(themeName);
+        // Reinitialize floor with new theme patterns
+        if (this.renderer) {
+            this.renderer.initializeFloor();
+            this.renderer.render();
+        }
     }
 
     update(deltaTime) {
@@ -511,6 +552,18 @@ export class Game {
 // Store game instance for cleanup
 let gameInstance = null;
 
+// Global theme switching function
+window.switchTheme = function(themeName) {
+    if (gameInstance && GAME_CONFIG.themes[themeName]) {
+        gameInstance.switchTheme(themeName);
+        // Update page title to show current theme
+        const theme = GAME_CONFIG.themes[themeName];
+        document.title = `Cast Arena - ${theme.name}`;
+    } else {
+        console.log('Available themes:', Object.keys(GAME_CONFIG.themes).filter(k => k !== 'current'));
+    }
+};
+
 // Start the game when the window loads
 window.addEventListener('load', () => {
     // Cleanup existing instance if any
@@ -518,6 +571,14 @@ window.addEventListener('load', () => {
         gameInstance.destroy();
     }
     gameInstance = new Game();
+    
+    // Update page title with current theme
+    const currentTheme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
+    document.title = `Cast Arena - ${currentTheme.name}`;
+    
+    // Log theme info
+    console.log(`🎨 Current theme: ${currentTheme.name}`);
+    console.log('💡 Switch themes by typing: switchTheme("fortress") or switchTheme("woods")');
 });
 
 // Cleanup on page unload
