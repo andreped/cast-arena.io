@@ -33,7 +33,11 @@ class SocketManager {
         const player = this.gameState.addPlayer(socket.id);
         
         socket.emit('currentPlayers', this.gameState.getCurrentState());
-        socket.emit('wallData', this.gameState.getWallState());
+        
+        // Send wall data to client for rendering
+        const wallData = this.gameState.getWallState();
+        socket.emit('wallData', wallData);
+        
         socket.emit('itemsUpdate', this.gameState.getItemsState());
         socket.broadcast.emit('newPlayer', player.toJSON());
         
@@ -52,6 +56,12 @@ class SocketManager {
         const player = this.gameState.getPlayer(socket.id);
         
         if (!player || !player.isAlive) {
+            return;
+        }
+
+        // CRITICAL: Reject movement updates for bots - they are server-authoritative!
+        if (player.isBot) {
+            console.warn(`🚫 Rejected client movement for bot ${player.name} (ID: ${socket.id})`);
             return;
         }
 

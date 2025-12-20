@@ -9,6 +9,8 @@ const gameConfig = {
         manaRegenRate: 2, // mana per second
         spawnProtectionDuration: 2000,
         respawnDelay: 3000,
+        size: 20, // Player collision radius
+        speed: 180, // Base movement speed (pixels per second) - matches client
         // Smooth movement physics (for reference, mainly handled client-side)
         acceleration: 800, // pixels per second²
         deceleration: 1200, // pixels per second²
@@ -27,7 +29,32 @@ const gameConfig = {
         tickDamage: 2,
         tickInterval: 1000
     },
-    colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8']
+    colors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8'],
+    bots: {
+        enabled: true,
+        count: 5, // Number of bots in game
+        
+        // Easy AI settings
+        visionRange: 400,        // How far bots can see
+        visionAngle: 120,        // Vision cone angle in degrees
+        reactionTimeMs: 400,     // Delay before shooting
+        shootCooldownMs: 500,    // Time between shots (reduced from 1000ms)
+        accuracy: 0.75,          // 75% accuracy (some misses)
+        wanderSpeed: 0.7,        // Speed multiplier when wandering
+        
+        // Behavior
+        itemScanRadius: 300,     // How far bots detect items
+        wanderChangeInterval: 2500, // Change direction every 2.5s
+        minShootDistance: 100,   // Don't shoot if too close
+        maxShootDistance: 400,   // Max shooting range
+        
+        // Bot names
+        names: [
+            'Wanderer', 'Nomad', 'Seeker', 'Rover', 
+            'Drifter', 'Scout', 'Ghost', 'Shadow',
+            'Phantom', 'Specter', 'Wraith', 'Shade'
+        ]
+    }
 };
 
 module.exports = gameConfig;

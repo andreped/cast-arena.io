@@ -20,6 +20,9 @@ const gameState = new GameState();
 const burnSystem = new BurnSystem(gameState, io);
 const socketManager = new SocketManager(io, gameState, burnSystem);
 
+// Initialize bots after io is ready
+gameState.initializeBots(io);
+
 // Game loop for server-side updates
 let gameLoopCounter = 0;
 const gameLoop = () => {

@@ -185,6 +185,7 @@ export class Game {
         if (!this.isDead) {
             this.input.update(deltaTime);
         }
+        this.updateRemotePlayers(deltaTime);
         this.updateCamera();
         this.updateSpells(deltaTime);
         this.updateExplosions(deltaTime);
@@ -192,6 +193,89 @@ export class Game {
         // Update UI with current player stats
         this.ui.updatePlayerStats();
         this.ui.updateActiveEffects();
+    }
+
+    updateRemotePlayers(deltaTime) {
+        // Predict remote HUMAN player positions between server updates using their velocity
+        // IMPORTANT: DO NOT predict bot positions - they are server-authoritative!
+        const deltaSeconds = deltaTime / 1000;
+        
+        for (const [id, player] of this.players) {
+            // Skip local player (handled by input system)
+            if (id === this.myId) continue;
+            
+            // Skip BOTS - they are 100% server authoritative, no client prediction needed!
+            if (player.isBot) continue;
+            
+            // Skip dead players - they should not move
+            if (!player.isAlive) {
+                player.velocityX = 0;
+                player.velocityY = 0;
+                continue;
+            }
+            
+            // Only predict HUMAN players between server updates
+            if (player.velocityX || player.velocityY) {
+                // Store original position for fallback
+                const originalX = player.x;
+                const originalY = player.y;
+                
+                // Calculate predicted position
+                const newX = player.x + player.velocityX * deltaSeconds;
+                const newY = player.y + player.velocityY * deltaSeconds;
+                const playerRadius = GAME_CONFIG.player.size;
+                
+                // Use EXACT same collision logic as server and human players
+                let finalX = originalX;
+                let finalY = originalY;
+                
+                const velocityThreshold = 0.1;
+                const isMovingX = Math.abs(player.velocityX) > velocityThreshold;
+                const isMovingY = Math.abs(player.velocityY) > velocityThreshold;
+                
+                if (isMovingX || isMovingY) {
+                    // Try the full movement first
+                    if (!this.checkWallCollision(newX, newY, playerRadius)) {
+                        // No collision - apply full movement with world boundaries
+                        finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, newX));
+                        finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, newY));
+                    } else {
+                        // Collision detected - try sliding along walls (same as server)
+                        let didSlide = false;
+                        let slideX = originalX;
+                        let slideY = originalY;
+                        
+                        // Try horizontal movement only
+                        if (isMovingX && !this.checkWallCollision(newX, originalY, playerRadius)) {
+                            slideX = newX;
+                            didSlide = true;
+                        } else if (isMovingX) {
+                            // Hit wall horizontally - stop horizontal velocity
+                            player.velocityX = 0;
+                        }
+                        
+                        // Try vertical movement only
+                        if (isMovingY && !this.checkWallCollision(originalX, newY, playerRadius)) {
+                            slideY = newY;
+                            didSlide = true;
+                        } else if (isMovingY) {
+                            // Hit wall vertically - stop vertical velocity
+                            player.velocityY = 0;
+                        }
+                        
+                        if (didSlide) {
+                            // Apply world boundaries to sliding movement
+                            finalX = Math.max(playerRadius, Math.min(GAME_CONFIG.world.width - playerRadius, slideX));
+                            finalY = Math.max(playerRadius, Math.min(GAME_CONFIG.world.height - playerRadius, slideY));
+                        }
+                    }
+                    
+                    // Apply the predicted position
+                    player.x = finalX;
+                    player.y = finalY;
+                }
+            }
+        }
     }
 
     updateCamera(instant = false) {
