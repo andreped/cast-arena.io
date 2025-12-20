@@ -56,7 +56,7 @@ export class NetworkSystem {
 
     handleCurrentPlayers(serverPlayers) {
         Object.entries(serverPlayers).forEach(([id, data]) => {
-            this.game.players.set(id, new Player(id, data));
+            this.game.players.set(id, new Player(id, data, this.game));
         });
         this.game.ui.updatePlayerCount();
         this.game.ui.updateLeaderboard();  // Update leaderboard with initial players
@@ -103,7 +103,7 @@ export class NetworkSystem {
     }
 
     handleNewPlayer(data) {
-        this.game.players.set(data.id, new Player(data.id, data));
+        this.game.players.set(data.id, new Player(data.id, data, this.game));
         this.game.ui.updatePlayerCount();
         this.game.ui.updateLeaderboard();  // Update when new player joins
     }

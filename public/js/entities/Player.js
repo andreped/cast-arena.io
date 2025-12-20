@@ -1,8 +1,9 @@
 import { GAME_CONFIG } from '../config/gameConfig.js';
 
 export class Player {
-    constructor(id, data = {}) {
+    constructor(id, data = {}, game = null) {
         this.id = id;
+        this.game = game; // Reference to game for camera access
         this.name = data.name || id; // Bot names or player ID
         this.isBot = data.isBot || false; // Flag to identify bots
         this.x = data.x || 0;
@@ -52,10 +53,29 @@ export class Player {
     }
 
     move(x, y) {
-        this.x = Math.max(GAME_CONFIG.player.size, 
-                         Math.min(GAME_CONFIG.world.width - GAME_CONFIG.player.size, x));
-        this.y = Math.max(GAME_CONFIG.player.size, 
-                         Math.min(GAME_CONFIG.world.height - GAME_CONFIG.player.size, y));
+        // Enforce world boundaries with proper padding
+        const minX = GAME_CONFIG.player.size;
+        const maxX = GAME_CONFIG.world.width - GAME_CONFIG.player.size;
+        const minY = GAME_CONFIG.player.size;
+        const maxY = GAME_CONFIG.world.height - GAME_CONFIG.player.size;
+        
+        this.x = Math.max(minX, Math.min(maxX, x));
+        this.y = Math.max(minY, Math.min(maxY, y));
+        
+        // Additional camera-based boundary enforcement to ensure player stays in visible area
+        if (this.game && this.game.camera) {
+            const viewportWidth = GAME_CONFIG.viewport.getWidth();
+            const viewportHeight = GAME_CONFIG.viewport.getHeight();
+            const padding = 50; // Minimum distance from screen edge
+            
+            const minVisibleX = this.game.camera.x + padding;
+            const maxVisibleX = this.game.camera.x + viewportWidth - padding;
+            const minVisibleY = this.game.camera.y + padding;
+            const maxVisibleY = this.game.camera.y + viewportHeight - padding;
+            
+            this.x = Math.max(minVisibleX, Math.min(maxVisibleX, this.x));
+            this.y = Math.max(minVisibleY, Math.min(maxVisibleY, this.y));
+        }
     }
 
     // New smooth movement system
@@ -221,10 +241,12 @@ export class Player {
     }
 
     isInViewport(cameraX, cameraY) {
+        const viewportWidth = GAME_CONFIG.viewport.getWidth();
+        const viewportHeight = GAME_CONFIG.viewport.getHeight();
         return this.x >= cameraX - GAME_CONFIG.world.viewportPadding &&
-               this.x <= cameraX + GAME_CONFIG.canvas.width + GAME_CONFIG.world.viewportPadding &&
+               this.x <= cameraX + viewportWidth + GAME_CONFIG.world.viewportPadding &&
                this.y >= cameraY - GAME_CONFIG.world.viewportPadding &&
-               this.y <= cameraY + GAME_CONFIG.canvas.height + GAME_CONFIG.world.viewportPadding;
+               this.y <= cameraY + viewportHeight + GAME_CONFIG.world.viewportPadding;
     }
     
     // Add a recent mana pickup for UI display

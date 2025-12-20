@@ -43,7 +43,9 @@ export class RenderSystem {
     }
 
     clearCanvas() {
-        this.ctx.clearRect(0, 0, this.game.canvas.width, this.game.canvas.height);
+        const canvasWidth = GAME_CONFIG.viewport.getWidth();
+        const canvasHeight = GAME_CONFIG.viewport.getHeight();
+        this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     }
 
     drawWorldBoundaries() {
@@ -56,10 +58,13 @@ export class RenderSystem {
         this.ctx.strokeStyle = `rgba(255, 255, 255, ${GAME_CONFIG.grid.opacity})`;
         this.ctx.lineWidth = 1;
 
+        const canvasWidth = GAME_CONFIG.viewport.getWidth();
+        const canvasHeight = GAME_CONFIG.viewport.getHeight();
+        
         const startX = Math.floor(this.game.camera.x / GAME_CONFIG.grid.size) * GAME_CONFIG.grid.size;
-        const endX = Math.ceil((this.game.camera.x + this.game.canvas.width) / GAME_CONFIG.grid.size) * GAME_CONFIG.grid.size;
+        const endX = Math.ceil((this.game.camera.x + canvasWidth) / GAME_CONFIG.grid.size) * GAME_CONFIG.grid.size;
         const startY = Math.floor(this.game.camera.y / GAME_CONFIG.grid.size) * GAME_CONFIG.grid.size;
-        const endY = Math.ceil((this.game.camera.y + this.game.canvas.height) / GAME_CONFIG.grid.size) * GAME_CONFIG.grid.size;
+        const endY = Math.ceil((this.game.camera.y + canvasHeight) / GAME_CONFIG.grid.size) * GAME_CONFIG.grid.size;
 
         for (let x = startX; x <= endX; x += GAME_CONFIG.grid.size) {
             this.ctx.beginPath();
@@ -1125,8 +1130,8 @@ export class RenderSystem {
         // Draw viewport area
         const vpX = this.game.camera.x * scale;
         const vpY = this.game.camera.y * scale;
-        const vpW = GAME_CONFIG.canvas.width * scale;
-        const vpH = GAME_CONFIG.canvas.height * scale;
+        const vpW = GAME_CONFIG.viewport.getWidth() * scale;
+        const vpH = GAME_CONFIG.viewport.getHeight() * scale;
         
         this.minimapCtx.strokeStyle = '#fff';
         this.minimapCtx.strokeRect(vpX, vpY, vpW, vpH);
