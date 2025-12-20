@@ -20,8 +20,8 @@ export class Game {
         // Set up dynamic viewport
         this.setupDynamicViewport();
         
-        // Apply current theme
-        this.applyTheme(GAME_CONFIG.themes.current);
+        // Theme will be set when server sends it via NetworkSystem
+        // this.applyTheme(GAME_CONFIG.themes.current); -- Removed to prevent client-side theme
         
         // Make canvas focusable and auto-focus for immediate keyboard input
         this.canvas.setAttribute('tabindex', '0');
@@ -247,6 +247,17 @@ export class Game {
 
     // Switch to a different theme
     switchTheme(themeName) {
+        this.applyTheme(themeName);
+        // Reinitialize floor with new theme patterns
+        if (this.renderer) {
+            this.renderer.initializeFloor();
+            this.renderer.render();
+        }
+    }
+
+    // Set theme from server (for synchronized themes across all players)
+    setTheme(themeName) {
+        console.log(`Setting server-synchronized theme: ${themeName}`);
         this.applyTheme(themeName);
         // Reinitialize floor with new theme patterns
         if (this.renderer) {

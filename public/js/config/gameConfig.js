@@ -43,7 +43,7 @@ export const GAME_CONFIG = {
         opacity: 0.1
     },
     themes: {
-        current: Math.random() > 0.66 ? 'fortress' : (Math.random() > 0.5 ? 'woods' : 'winter'), // Randomly select theme at start
+        current: 'fortress', // Default until server sends the real theme
         fortress: {
             name: 'Fortress',
             description: 'Ancient stone fortress with gray walls',

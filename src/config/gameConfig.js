@@ -3,6 +3,10 @@ const gameConfig = {
         width: 800 * 4.5,  // Increased by 50% (was 800 * 3 = 2400, now 3600)
         height: 600 * 4.5  // Increased by 50% (was 600 * 3 = 1800, now 2700)
     },
+    theme: {
+        // Server-side theme selection - all players see the same theme
+        current: Math.random() > 0.66 ? 'fortress' : (Math.random() > 0.5 ? 'woods' : 'winter')
+    },
     player: {
         maxHealth: 100,
         maxMana: 50,
