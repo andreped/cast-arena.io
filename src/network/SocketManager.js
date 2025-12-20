@@ -22,6 +22,7 @@ class SocketManager {
 
             socket.on('playerMovement', (data) => this.handlePlayerMovement(socket, data));
             socket.on('playerAiming', (data) => this.handlePlayerAiming(socket, data));
+            socket.on('setPlayerName', (data) => this.handleSetPlayerName(socket, data));
             socket.on('castSpell', (data) => this.handleSpellCast(socket, data));
             socket.on('castRingOfFire', (data) => this.handleRingOfFireCast(socket, data));
             socket.on('spellHit', (data) => this.handleSpellHit(socket, data));
@@ -31,6 +32,9 @@ class SocketManager {
 
     handlePlayerConnection(socket) {
         const player = this.gameState.addPlayer(socket.id);
+        
+        // Ensure the initial generated name is unique
+        player.name = this.ensureUniqueName(player.name, socket.id);
         
         socket.emit('currentPlayers', this.gameState.getCurrentState());
         
@@ -161,6 +165,80 @@ class SocketManager {
             id: socket.id,
             aimingAngle: player.aimingAngle
         });
+    }
+
+    handleSetPlayerName(socket, data) {
+        const player = this.gameState.getPlayer(socket.id);
+        
+        if (!player || !data.name) {
+            return;
+        }
+
+        // Clean and limit the name
+        let desiredName = data.name.trim().substring(0, 20);
+        
+        // Check for duplicate names and add random suffix if needed
+        const finalName = this.ensureUniqueName(desiredName, socket.id);
+        
+        // Update player name
+        player.name = finalName;
+        
+        // Broadcast updated player info to all clients
+        this.io.emit('playerNameUpdated', {
+            id: socket.id,
+            name: player.name
+        });
+        
+        console.log(`Player ${socket.id} set name to: ${player.name}`);
+    }
+
+    ensureUniqueName(desiredName, currentPlayerId) {
+        // Get all current player names (excluding the current player)
+        const existingNames = new Set();
+        
+        // Check human players
+        for (const [playerId, player] of this.gameState.players) {
+            if (playerId !== currentPlayerId && player.name) {
+                existingNames.add(player.name);
+            }
+        }
+        
+        // Check bot players
+        if (this.gameState.botManager && this.gameState.botManager.bots) {
+            for (const [botId, bot] of this.gameState.botManager.bots) {
+                if (bot.player && bot.player.name) {
+                    existingNames.add(bot.player.name);
+                }
+            }
+        }
+        
+        // If name is unique, return as is
+        if (!existingNames.has(desiredName)) {
+            return desiredName;
+        }
+        
+        // Name collision detected - add random suffix
+        const randomSuffix = this.generateRandomSuffix();
+        const uniqueName = `${desiredName} - ${randomSuffix}`;
+        
+        // Double check the new name isn't also taken (very unlikely)
+        if (existingNames.has(uniqueName)) {
+            // If still collision, try again with different suffix
+            return this.ensureUniqueName(desiredName, currentPlayerId);
+        }
+        
+        console.log(`Name collision detected. Changed '${desiredName}' to '${uniqueName}'`);
+        return uniqueName;
+    }
+    
+    generateRandomSuffix() {
+        // Generate 2 random alphanumeric characters
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 2; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
     }
 
     handleSpellCast(socket, spellData) {

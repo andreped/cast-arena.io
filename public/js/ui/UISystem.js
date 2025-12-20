@@ -14,6 +14,7 @@ export class UISystem {
         this.initPlayerStatsUI();
         this.initAudioControls();
         this.initModalAudioControls();
+        this.setupNameChangeControls();
         if (this.game.input.isMobile) {
             this.createMobileControls();
         }
@@ -502,9 +503,8 @@ export class UISystem {
         const html = playersList.map((player, index) => {
             const rank = index + 1;
             const rankEmoji = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '▫️';
-            // Show "You" for local player, bot name for bots, or truncated ID for other players
-            const playerName = player.isMe ? 'You' : 
-                              (player.isBot ? player.name : `Player ${player.id.slice(0, 4)}`);
+            // Show "You" for local player, or use the player's name (custom name for humans, bot name for bots)
+            const playerName = player.isMe ? 'You' : player.name;
             const status = player.isAlive ? '🧙‍♂️' : '💀';
             return `
                 <div class="leaderboard-row ${player.isMe ? 'highlight' : ''}">
@@ -517,6 +517,61 @@ export class UISystem {
         }).join('');
 
         content.innerHTML = html;
+    }
+
+    setupNameChangeControls() {
+        const nameChangeInput = document.getElementById('nameChangeInput');
+        const changeNameBtn = document.getElementById('changeNameBtn');
+        
+        if (nameChangeInput && changeNameBtn) {
+            // Set current name in input
+            const storedName = localStorage.getItem('castArenaPlayerName');
+            if (storedName) {
+                nameChangeInput.value = storedName;
+            }
+            
+            // Handle name change button click
+            changeNameBtn.addEventListener('click', () => {
+                this.changeName();
+            });
+            
+            // Handle enter key in name input
+            nameChangeInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.changeName();
+                }
+            });
+        }
+    }
+    
+    changeName() {
+        const nameChangeInput = document.getElementById('nameChangeInput');
+        const newName = nameChangeInput.value.trim();
+        
+        if (!newName) {
+            alert('Please enter a valid name!');
+            return;
+        }
+        
+        // Update localStorage
+        localStorage.setItem('castArenaPlayerName', newName);
+        
+        // Send to server
+        if (this.game.network && this.game.network.socket) {
+            this.game.network.socket.emit('setPlayerName', { name: newName });
+        }
+        
+        // Update local game instance name
+        this.game.playerName = newName;
+        
+        console.log(`Name changed to: ${newName}`);
+        
+        // Show confirmation (optional)
+        const originalText = nameChangeInput.placeholder;
+        nameChangeInput.placeholder = 'Name updated!';
+        setTimeout(() => {
+            nameChangeInput.placeholder = 'Enter new name...';
+        }, 2000);
     }
 
     createMobileControls() {
