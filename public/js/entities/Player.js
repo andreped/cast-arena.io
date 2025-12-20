@@ -3,6 +3,8 @@ import { GAME_CONFIG } from '../config/gameConfig.js';
 export class Player {
     constructor(id, data = {}) {
         this.id = id;
+        this.name = data.name || id; // Bot names or player ID
+        this.isBot = data.isBot || false; // Flag to identify bots
         this.x = data.x || 0;
         this.y = data.y || 0;
         this.color = data.color || '#FFFFFF';

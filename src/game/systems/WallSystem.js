@@ -6,8 +6,7 @@ class WallSystem {
         this.walls = new Map();
         this.wallThickness = 30; // Increased from 20
         this.minDistanceFromSpawn = 150; // Increased spawn protection area
-        this.seed = Math.floor(Math.random() * 1000000); // Random seed for each server startup
-        console.log(`WallSystem initialized with seed: ${this.seed}`);
+        this.seed = 12345; // Fixed seed for consistent wall layout across restarts
         this.generateWalls();
     }
 

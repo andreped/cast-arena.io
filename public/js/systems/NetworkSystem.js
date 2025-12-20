@@ -117,8 +117,26 @@ export class NetworkSystem {
         
         const player = this.game.players.get(data.id);
         if (player) {
-            player.x = data.x;
-            player.y = data.y;
+            // DISABLE SMOOTHING FOR BOTS to see raw server positions
+            if (player.isBot) {
+                // NO smoothing - direct snap to server position
+                player.x = data.x;
+                player.y = data.y;
+            } else {
+                // Smoothly interpolate to new position instead of snapping
+                // This prevents visual glitches when server updates are less frequent than render rate
+                player.x = data.x;
+                player.y = data.y;
+            }
+            
+            // Update velocity for client-side prediction between server updates
+            if (data.velocityX !== undefined) {
+                player.velocityX = data.velocityX;
+            }
+            if (data.velocityY !== undefined) {
+                player.velocityY = data.velocityY;
+            }
+            
             if (data.facingLeft !== undefined) {
                 player.facingLeft = data.facingLeft;
             }
@@ -222,11 +240,11 @@ export class NetworkSystem {
             }
         }
         
-        // Add kill feed entry
+        // Add kill feed entry with proper names (use player.name for bots)
         const killerName = data.killerId === this.game.myId ? 'You' : 
-                          killer ? `Player ${data.killerId.slice(0, 4)}` : null;
+                          killer ? (killer.name || `Player ${data.killerId.slice(0, 4)}`) : 'Unknown';
         const victimName = data.victimId === this.game.myId ? 'You' : 
-                          victim ? `Player ${data.victimId.slice(0, 4)}` : 'Unknown';
+                          victim ? (victim.name || `Player ${data.victimId.slice(0, 4)}`) : 'Unknown';
         
         this.game.ui.addKillFeedEntry(killerName, victimName, '🔥');
     }

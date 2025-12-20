@@ -8,7 +8,6 @@ class ItemSystem {
         this.gameState = gameState;
         this.items = new Map();
         this.seed = Math.floor(Math.random() * 1000000); // Random seed for each server startup
-        console.log(`ItemSystem initialized with seed: ${this.seed}`);
         this.itemsChanged = false; // Track if items have changed since last broadcast
         
         // Item type configurations - easily extendable for future items

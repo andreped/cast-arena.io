@@ -487,6 +487,8 @@ export class UISystem {
             console.log('Processing player:', id, player);
             playersList.push({
                 id: player.id,
+                name: player.name || player.id, // Use bot names or player ID
+                isBot: player.isBot || false,
                 kills: player.kills || 0,
                 isAlive: player.isAlive,
                 isMe: player.id === this.game.myId
@@ -500,7 +502,9 @@ export class UISystem {
         const html = playersList.map((player, index) => {
             const rank = index + 1;
             const rankEmoji = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '▫️';
-            const playerName = player.isMe ? 'You' : `Player ${player.id.slice(0, 4)}`;
+            // Show "You" for local player, bot name for bots, or truncated ID for other players
+            const playerName = player.isMe ? 'You' : 
+                              (player.isBot ? player.name : `Player ${player.id.slice(0, 4)}`);
             const status = player.isAlive ? '🧙‍♂️' : '💀';
             return `
                 <div class="leaderboard-row ${player.isMe ? 'highlight' : ''}">

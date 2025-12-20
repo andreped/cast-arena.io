@@ -14,9 +14,16 @@ class Wall {
     collidesWith(x, y, radius = 0) {
         // For walls with windows, check each segment individually
         if (this.hasWindows || this.segments.length > 0) {
-            return this.segments.some(segment => 
-                this.pointInRectangle(x, y, radius, segment)
-            );
+            return this.segments.some(segment => {
+                // Convert relative segment coordinates to absolute world coordinates
+                const absoluteSegment = {
+                    x: this.x + segment.x,
+                    y: this.y + segment.y,
+                    width: segment.width,
+                    height: segment.height
+                };
+                return this.pointInRectangle(x, y, radius, absoluteSegment);
+            });
         }
         
         // For simple rectangular walls
@@ -38,9 +45,16 @@ class Wall {
     // Check if a line (like a spell trajectory) intersects this wall
     intersectsLine(x1, y1, x2, y2) {
         if (this.hasWindows || this.segments.length > 0) {
-            return this.segments.some(segment => 
-                this.lineIntersectsRectangle(x1, y1, x2, y2, segment)
-            );
+            return this.segments.some(segment => {
+                // Convert relative segment coordinates to absolute world coordinates
+                const absoluteSegment = {
+                    x: this.x + segment.x,
+                    y: this.y + segment.y,
+                    width: segment.width,
+                    height: segment.height
+                };
+                return this.lineIntersectsRectangle(x1, y1, x2, y2, absoluteSegment);
+            });
         }
         
         return this.lineIntersectsRectangle(x1, y1, x2, y2, {

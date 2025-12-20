@@ -20,6 +20,7 @@ class Player {
         this.hasSpawned = false;
         this.respawnImmunity = false;
         this.spawnProtection = false;
+        this.spawnProtectionEndTime = 0; // Timestamp when spawn protection ends
         this.speedBuffs = []; // Array to track multiple speed buffs
         this.currentSpeedMultiplier = 1.0;
         this.lastBroadcastMana = gameConfig.player.maxMana; // Track last broadcasted mana value
@@ -57,6 +58,7 @@ class Player {
         this.burnEndTime = 0;
         this.respawnImmunity = true;
         this.spawnProtection = true;
+        this.spawnProtectionEndTime = Date.now() + gameConfig.player.spawnProtectionDuration;
 
         if (this.hasSpawned) {
             this.kills = 0;
@@ -109,6 +111,12 @@ class Player {
         }
         
         return this.mana - oldMana; // Return actual amount restored
+    }
+
+    updateSpawnProtection() {
+        if (this.spawnProtection && Date.now() >= this.spawnProtectionEndTime) {
+            this.spawnProtection = false;
+        }
     }
 
     updateMana() {
@@ -172,11 +180,86 @@ class Player {
         return gameConfig.player.speed * this.currentSpeedMultiplier;
     }
 
+    // Bot physics simulation (same as client-side)
+    updateVelocity(inputX, inputY, deltaTime) {
+        const deltaSeconds = deltaTime / 1000;
+        const maxVelocity = this.getEffectiveSpeed() || 400; // Default speed if not defined
+        const acceleration = gameConfig.player.acceleration;
+        const deceleration = gameConfig.player.deceleration;
+        
+        // Calculate target velocity based on input
+        const targetVelX = inputX * maxVelocity;
+        const targetVelY = inputY * maxVelocity;
+        
+        // Apply acceleration towards target velocity (horizontal)
+        if (inputX !== 0) {
+            const velDiffX = targetVelX - this.velocityX;
+            const accelX = Math.sign(velDiffX) * acceleration * deltaSeconds;
+            
+            if (Math.abs(accelX) >= Math.abs(velDiffX)) {
+                this.velocityX = targetVelX;
+            } else {
+                this.velocityX += accelX;
+            }
+        } else {
+            // No horizontal input - apply deceleration
+            if (Math.abs(this.velocityX) > 0.1) {
+                const decelX = Math.sign(this.velocityX) * deceleration * deltaSeconds;
+                if (Math.abs(decelX) >= Math.abs(this.velocityX)) {
+                    this.velocityX = 0;
+                } else {
+                    this.velocityX -= decelX;
+                }
+            } else {
+                this.velocityX = 0;
+            }
+        }
+        
+        // Apply acceleration towards target velocity (vertical)
+        if (inputY !== 0) {
+            const velDiffY = targetVelY - this.velocityY;
+            const accelY = Math.sign(velDiffY) * acceleration * deltaSeconds;
+            
+            if (Math.abs(accelY) >= Math.abs(velDiffY)) {
+                this.velocityY = targetVelY;
+            } else {
+                this.velocityY += accelY;
+            }
+        } else {
+            // No vertical input - apply deceleration
+            if (Math.abs(this.velocityY) > 0.1) {
+                const decelY = Math.sign(this.velocityY) * deceleration * deltaSeconds;
+                if (Math.abs(decelY) >= Math.abs(this.velocityY)) {
+                    this.velocityY = 0;
+                } else {
+                    this.velocityY -= decelY;
+                }
+            } else {
+                this.velocityY = 0;
+            }
+        }
+    }
+
     applyRecoil(angle, force) {
         // Apply recoil force in the opposite direction of the spell
         const recoilAngle = angle + Math.PI;
-        this.velocityX += Math.cos(recoilAngle) * force;
-        this.velocityY += Math.sin(recoilAngle) * force;
+        const recoilX = Math.cos(recoilAngle) * force;
+        const recoilY = Math.sin(recoilAngle) * force;
+        
+        // For bots, limit recoil to prevent wall tunneling
+        if (this.isBot) {
+            const maxRecoilVelocity = 50; // Much smaller recoil for bots to prevent tunneling
+            const limitedRecoilX = Math.max(-maxRecoilVelocity, Math.min(maxRecoilVelocity, recoilX));
+            const limitedRecoilY = Math.max(-maxRecoilVelocity, Math.min(maxRecoilVelocity, recoilY));
+                        
+            // For bots: NO recoil velocity at all to prevent any chance of wall tunneling
+            // Recoil was causing the wall walking issue!
+            // Do not add any recoil velocity to bots
+        } else {
+            // Normal recoil for human players
+            this.velocityX += recoilX;
+            this.velocityY += recoilY;
+        }
     }
 
     // Mana change tracking methods for optimization
@@ -212,6 +295,8 @@ class Player {
     toJSON() {
         return {
             id: this.id,
+            name: this.name || this.id, // Include bot names
+            isBot: this.isBot || false, // Flag for bots
             x: this.x,
             y: this.y,
             color: this.color,
