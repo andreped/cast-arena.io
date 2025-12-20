@@ -64,6 +64,11 @@ class Player {
         this.respawnImmunity = true;
         this.spawnProtection = true;
         this.spawnProtectionEndTime = Date.now() + gameConfig.player.spawnProtectionDuration;
+        
+        // Reset all item states on respawn
+        this.ringOfFireCharges = 0;
+        this.speedBuffs = [];
+        this.currentSpeedMultiplier = 1.0;
 
         if (this.hasSpawned) {
             this.kills = 0;
@@ -77,7 +82,11 @@ class Player {
             y: this.y,
             health: this.health,
             kills: this.kills,
-            isAlive: this.isAlive
+            isAlive: this.isAlive,
+            ringOfFireCharges: this.ringOfFireCharges,
+            speedBuffs: this.speedBuffs,
+            currentSpeedMultiplier: this.currentSpeedMultiplier,
+            mana: this.mana
         };
     }
 
