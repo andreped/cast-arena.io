@@ -10,6 +10,7 @@ class RingOfFireItem {
         this.pickupRadius = 35;
         this.color = '#FF4500'; // Orange-red fire color
         this.createdAt = Date.now();
+        this.animationOffset = Math.random() * Math.PI * 2; // Random animation offset for smooth animation
     }
 
     // Check if item is close enough to a player for pickup
@@ -29,7 +30,8 @@ class RingOfFireItem {
             type: this.type,
             size: this.size,
             pickupRadius: this.pickupRadius,
-            color: this.color
+            color: this.color,
+            animationOffset: this.animationOffset
         };
     }
 }
