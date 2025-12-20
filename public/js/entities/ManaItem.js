@@ -8,7 +8,8 @@ export class ManaItem {
         this.pickupRadius = data.pickupRadius || 30;
         this.color = data.color || '#0080FF'; // Bright blue
         this.manaRestore = data.manaRestore;
-        this.animationOffset = Math.random() * Math.PI * 2; // Random start for animation
+        // Use server-provided animationOffset or generate new one if missing
+        this.animationOffset = data.animationOffset !== undefined ? data.animationOffset : Math.random() * Math.PI * 2;
     }
 
     // Check if item is close enough to a player for pickup

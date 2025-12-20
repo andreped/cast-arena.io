@@ -9,6 +9,7 @@ class ManaItem {
         this.pickupRadius = 40; // Pickup radius for easy collection
         this.color = '#0080FF'; // Bright blue color
         this.createdAt = Date.now();
+        this.animationOffset = Math.random() * Math.PI * 2; // Random animation offset for smooth animation
     }
 
     // Check if item is close enough to a player for pickup
@@ -28,7 +29,8 @@ class ManaItem {
             size: this.size,
             pickupRadius: this.pickupRadius,
             color: this.color,
-            manaRestore: this.manaRestore
+            manaRestore: this.manaRestore,
+            animationOffset: this.animationOffset
         };
     }
 }

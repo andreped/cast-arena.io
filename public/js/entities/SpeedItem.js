@@ -9,7 +9,8 @@ export class SpeedItem {
         this.color = data.color || '#00FF00'; // Bright green
         this.speedBoost = data.speedBoost;
         this.duration = data.duration;
-        this.animationOffset = Math.random() * Math.PI * 2; // Random start for animation
+        // Use server-provided animationOffset or generate new one if missing
+        this.animationOffset = data.animationOffset !== undefined ? data.animationOffset : Math.random() * Math.PI * 2;
     }
 
     // Check if item is close enough to a player for pickup

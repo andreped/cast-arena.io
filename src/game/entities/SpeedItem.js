@@ -10,6 +10,7 @@ class SpeedItem {
         this.pickupRadius = 40; // Larger pickup radius for easier collection
         this.color = '#00FF00'; // Bright green color
         this.createdAt = Date.now();
+        this.animationOffset = Math.random() * Math.PI * 2; // Random animation offset for smooth animation
     }
 
     // Check if item is close enough to a player for pickup
@@ -30,7 +31,8 @@ class SpeedItem {
             pickupRadius: this.pickupRadius,
             color: this.color,
             speedBoost: this.speedBoost,
-            duration: this.duration
+            duration: this.duration,
+            animationOffset: this.animationOffset
         };
     }
 }

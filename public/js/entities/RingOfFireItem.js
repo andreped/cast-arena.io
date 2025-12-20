@@ -7,7 +7,8 @@ export class RingOfFireItem {
         this.size = data.size || 30; // Larger size for this rare item
         this.pickupRadius = data.pickupRadius || 35;
         this.color = data.color || '#FF4500'; // Orange-red fire color
-        this.animationOffset = Math.random() * Math.PI * 2; // Random start for animation
+        // Use server-provided animationOffset or generate new one if missing
+        this.animationOffset = data.animationOffset !== undefined ? data.animationOffset : Math.random() * Math.PI * 2;
         this.glowIntensity = 0; // For pulsing glow effect
     }
 
