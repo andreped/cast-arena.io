@@ -551,8 +551,8 @@ export class RenderSystem {
             this.drawSnowCaps(x, y - trunkHeight/2, width, crownHeight, treeConfig);
         }
         
-        // Add winter frosting effect for better visibility in winter theme
-        if (GAME_CONFIG.themes.current === 'winter' && !treeConfig.isSnowman) {
+        // Add winter frosting effect for better visibility in winter theme only
+        if (GAME_CONFIG.themes.current === 'winter' && !treeConfig.isSnowman && treeConfig.snowCaps) {
             this.addWinterFrosting(tree, x, y - trunkHeight/2, width, crownHeight, treeConfig);
         }
 
@@ -821,15 +821,16 @@ export class RenderSystem {
         if (treeConfig.crownShape === 'triangle') {
             // Add bright snow highlights on triangle edges
             this.ctx.strokeStyle = '#FFFFFF';
-            this.ctx.lineWidth = 3;
-            this.ctx.globalAlpha = 0.9;
+            this.ctx.lineWidth = 2; // Reduced from 3
+            this.ctx.globalAlpha = 0.6; // Reduced from 0.9
             this.ctx.beginPath();
             this.ctx.moveTo(x - width/2 + 5, y + height - 8);
             this.ctx.lineTo(x, y + 8);
             this.ctx.lineTo(x + width/2 - 5, y + height - 8);
             this.ctx.stroke();
             
-            // Add contrast outline
+            // Remove harsh black outline - commenting out
+            /*
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 1;
             this.ctx.globalAlpha = 0.7;
@@ -839,8 +840,10 @@ export class RenderSystem {
             this.ctx.lineTo(x + width/2, y + height);
             this.ctx.closePath();
             this.ctx.stroke();
+            */
         } else if (treeConfig.crownShape === 'circle' || treeConfig.crownShape === 'oval') {
-            // Add bright snow patches and outline
+            // Remove harsh black outline - commenting out
+            /*
             this.ctx.strokeStyle = '#000000';
             this.ctx.lineWidth = 1;
             this.ctx.globalAlpha = 0.6;
@@ -851,18 +854,19 @@ export class RenderSystem {
                 this.ctx.ellipse(x, y + height/2, width/2, height/2, 0, 0, Math.PI * 2);
             }
             this.ctx.stroke();
+            */
             
-            // Add bright snow highlights
+            // Add subtle snow highlights only
             this.ctx.fillStyle = '#FFFFFF';
-            this.ctx.globalAlpha = 0.8;
-            const numHighlights = 4;
+            this.ctx.globalAlpha = 0.4; // Reduced from 0.8
+            const numHighlights = 3; // Reduced from 4
             for (let i = 0; i < numHighlights; i++) {
                 const angle = (i / numHighlights) * Math.PI * 2;
-                const highlightX = x + Math.cos(angle) * width * 0.25;
-                const highlightY = y + height/2 + Math.sin(angle) * height * 0.25;
+                const highlightX = x + Math.cos(angle) * width * 0.2; // Reduced from 0.25
+                const highlightY = y + height/2 + Math.sin(angle) * height * 0.2; // Reduced from 0.25
                 
                 this.ctx.beginPath();
-                this.ctx.arc(highlightX, highlightY, 6, 0, Math.PI * 2);
+                this.ctx.arc(highlightX, highlightY, 4, 0, Math.PI * 2); // Reduced from 6
                 this.ctx.fill();
             }
         }
