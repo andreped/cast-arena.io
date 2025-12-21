@@ -25,8 +25,7 @@ export class RenderSystem {
         
         this.drawFloor();
         this.drawWorldBoundaries();
-        this.drawWalls();
-        this.drawEntitiesWithZOrder(); // Draw players and trees with proper z-ordering
+        this.drawEntitiesWithZOrder(); // Draw players, trees, and walls with proper z-ordering
         this.drawFallingLeaves();
         this.drawGrid();
         this.drawItems();
@@ -319,25 +318,82 @@ export class RenderSystem {
             }
         }
 
-        // Draw wall with 3D effect
+        // Draw wall with angled top-down perspective (Stardew Valley style)
+        this.drawAngledWall(x, y, width, height, baseColor, edgeColor, shadowColor, wallType);
+    }
+
+    drawAngledWall(x, y, width, height, baseColor, edgeColor, shadowColor, wallType) {
+        const perspectiveDepth = 16; // Increased depth for more pronounced angle
+        const cornerDepth = 8; // Increased corner depth
+        
+        this.ctx.save();
+        
+        // 1. Draw the main top face (what you see from above)
         this.ctx.fillStyle = baseColor;
         this.ctx.fillRect(x, y, width, height);
         
-        // Add edge highlight
+        // 2. Draw the right side face (angled perspective)
+        if (x + width < GAME_CONFIG.world.width) { // Don't draw right face if it's at world edge
+            this.ctx.fillStyle = this.darkenColor(baseColor, 35); // Increased darkness for better depth
+            this.ctx.beginPath();
+            this.ctx.moveTo(x + width, y);
+            this.ctx.lineTo(x + width + perspectiveDepth, y + perspectiveDepth);
+            this.ctx.lineTo(x + width + perspectiveDepth, y + height + perspectiveDepth);
+            this.ctx.lineTo(x + width, y + height);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // 3. Draw the bottom face (angled perspective)
+        if (y + height < GAME_CONFIG.world.height) { // Don't draw bottom face if it's at world edge
+            this.ctx.fillStyle = this.darkenColor(baseColor, 45); // Increased darkness for better depth
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y + height);
+            this.ctx.lineTo(x + perspectiveDepth, y + height + perspectiveDepth);
+            this.ctx.lineTo(x + width + perspectiveDepth, y + height + perspectiveDepth);
+            this.ctx.lineTo(x + width, y + height);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // 4. Draw corner piece if both right and bottom faces are visible
+        if (x + width < GAME_CONFIG.world.width && y + height < GAME_CONFIG.world.height) {
+            this.ctx.fillStyle = this.darkenColor(baseColor, 55); // Darkest corner for maximum depth
+            this.ctx.beginPath();
+            this.ctx.moveTo(x + width, y + height);
+            this.ctx.lineTo(x + width + perspectiveDepth, y + height + perspectiveDepth);
+            this.ctx.lineTo(x + width + cornerDepth, y + height + cornerDepth);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // 5. Add top face highlights and details
         this.ctx.fillStyle = edgeColor;
-        this.ctx.fillRect(x, y, width, 2);
-        this.ctx.fillRect(x, y, 2, height);
+        this.ctx.fillRect(x, y, width, 2); // Top edge
+        this.ctx.fillRect(x, y, 2, height); // Left edge
         
-        // Add shadow
+        // 6. Add subtle inner shadow on top face
         this.ctx.fillStyle = shadowColor;
-        this.ctx.fillRect(x + width - 2, y + 2, 2, height - 2);
-        this.ctx.fillRect(x + 2, y + height - 2, width - 2, 2);
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.fillRect(x + width - 3, y + 3, 3, height - 3); // Right inner shadow
+        this.ctx.fillRect(x + 3, y + height - 3, width - 3, 3); // Bottom inner shadow
+        this.ctx.globalAlpha = 1;
         
-        // Add pixelated texture
-        this.addWallTexture(x, y, width, height, wallType);
+        // 7. Add angled texture to top face
+        this.addAngledWallTexture(x, y, width, height, wallType);
+        
+        // 8. Add side face textures
+        if (x + width < GAME_CONFIG.world.width) {
+            this.addSideFaceTexture(x + width, y, perspectiveDepth, height, wallType, 'right');
+        }
+        if (y + height < GAME_CONFIG.world.height) {
+            this.addSideFaceTexture(x, y + height, width, perspectiveDepth, wallType, 'bottom');
+        }
+        
+        this.ctx.restore();
     }
-
-    addWallTexture(x, y, width, height, wallType) {
+    
+    addAngledWallTexture(x, y, width, height, wallType) {
         const textureSize = 8;
         const cols = Math.floor(width / textureSize);
         const rows = Math.floor(height / textureSize);
@@ -364,6 +420,49 @@ export class RenderSystem {
                 }
             }
         }
+    }
+    
+    addSideFaceTexture(x, y, width, height, wallType, face) {
+        const textureSize = 6;
+        let cols, rows;
+        
+        if (face === 'right') {
+            cols = Math.floor(width / textureSize);
+            rows = Math.floor(height / textureSize);
+        } else { // bottom
+            cols = Math.floor(width / textureSize);
+            rows = Math.floor(height / textureSize);
+        }
+        
+        this.ctx.globalAlpha = 0.6;
+        
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                let textureX, textureY;
+                
+                if (face === 'right') {
+                    textureX = x + col * textureSize;
+                    textureY = y + row * textureSize;
+                } else { // bottom
+                    textureX = x + col * textureSize;
+                    textureY = y + row * textureSize;
+                }
+                
+                // Create texture pattern
+                const seed = textureX * 19 + textureY * 23 + wallType.length * 11;
+                const rand = this.seededRandom(seed);
+                
+                if (rand < 0.2) {
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                    this.ctx.fillRect(textureX, textureY, textureSize, textureSize);
+                } else if (rand > 0.8) {
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    this.ctx.fillRect(textureX, textureY, textureSize, textureSize);
+                }
+            }
+        }
+        
+        this.ctx.globalAlpha = 1;
     }
 
     drawTrees() {
@@ -1283,7 +1382,7 @@ export class RenderSystem {
     }
 
     drawEntitiesWithZOrder() {
-        // Create array of all entities (players and trees) with their y-positions for z-ordering
+        // Create array of all entities (players, trees, and walls) with their y-positions for z-ordering
         const entities = [];
         
         // Add players
@@ -1292,7 +1391,7 @@ export class RenderSystem {
                 entities.push({
                     type: 'player',
                     entity: player,
-                    z: player.y + player.height // Use bottom of player for z-order
+                    z: player.y + GAME_CONFIG.player.size // Use bottom of player for z-order
                 });
             }
         });
@@ -1311,18 +1410,81 @@ export class RenderSystem {
         // Sort by z-position (back to front)
         entities.sort((a, b) => a.z - b.z);
         
-        // Draw entities in correct order
+        // Draw entities in correct order, with walls handled separately for each player
         entities.forEach(item => {
             if (item.type === 'player') {
+                // First draw walls that should appear behind this player
+                this.drawWallsForPlayer(item.entity, 'behind');
+                
+                // Then draw the player
                 this.drawPlayer(item.entity, item.entity.id === this.game.myId);
                 // Draw health bar after player
                 if (item.entity.isAlive) {
                     this.drawHealthBar(item.entity);
                 }
+                
+                // Finally draw walls that should appear in front of this player
+                this.drawWallsForPlayer(item.entity, 'front');
             } else if (item.type === 'tree') {
                 this.drawTree(item.entity);
             }
         });
+    }
+    
+    drawWallsForPlayer(player, renderPhase) {
+        this.game.walls.forEach(wall => {
+            if (wall.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                if (wall.segments && wall.segments.length > 0) {
+                    // For segmented walls, check each segment
+                    wall.segments.forEach(segment => {
+                        const wallX = wall.x + segment.x;
+                        const wallY = wall.y + segment.y;
+                        const wallWidth = segment.width;
+                        const wallHeight = segment.height;
+                        
+                        if (this.shouldRenderWall(player, wallX, wallY, wallWidth, wallHeight, renderPhase)) {
+                            this.drawWallSegment(wallX, wallY, wallWidth, wallHeight, wall.type);
+                        }
+                    });
+                } else {
+                    // Simple rectangular wall
+                    if (this.shouldRenderWall(player, wall.x, wall.y, wall.width, wall.height, renderPhase)) {
+                        this.drawWallSegment(wall.x, wall.y, wall.width, wall.height, wall.type);
+                    }
+                }
+            }
+        });
+    }
+    
+    shouldRenderWall(player, wallX, wallY, wallWidth, wallHeight, renderPhase) {
+        // Calculate player center
+        const playerCenterX = player.x;
+        const playerCenterY = player.y;
+        
+        // Calculate wall center
+        const wallCenterX = wallX + wallWidth / 2;
+        const wallCenterY = wallY + wallHeight / 2;
+        
+        // Determine if player is "behind" the wall based on the angled perspective
+        // The perspective extends towards bottom-right, so players are "behind" when they are:
+        // 1. To the left of the wall (lower X)
+        // 2. Above the wall (lower Y)
+        // But we need to weight this based on the perspective angle
+        
+        const deltaX = playerCenterX - wallCenterX;
+        const deltaY = playerCenterY - wallCenterY;
+        
+        // Use a 45-degree perspective line to determine if player is behind wall
+        // For angled perspective extending to bottom-right:
+        // Player is "behind" if they are above and to the left of the perspective line
+        const perspectiveOffset = deltaX + deltaY; // This creates a 45-degree dividing line
+        
+        const playerIsBehind = perspectiveOffset < 0;
+        
+        // Render wall in "behind" phase if player should be hidden by it
+        // Render wall in "front" phase if player should be visible in front of it
+        return (renderPhase === 'behind' && playerIsBehind) || 
+               (renderPhase === 'front' && !playerIsBehind);
     }
 
     drawPlayers() {
