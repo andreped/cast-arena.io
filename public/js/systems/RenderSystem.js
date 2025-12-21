@@ -26,12 +26,13 @@ export class RenderSystem {
         this.drawFloor();
         this.drawWorldBoundaries();
         this.drawWalls();
+        this.drawEntitiesWithZOrder(); // Draw players and trees with proper z-ordering
+        this.drawFallingLeaves();
         this.drawGrid();
         this.drawItems();
         this.drawSpells();
         this.drawExplosions();
         this.drawRingOfFireEffects();
-        this.drawPlayers();
         
         this.ctx.restore();
         this.renderMinimap();
@@ -53,6 +54,53 @@ export class RenderSystem {
         this.ctx.strokeStyle = theme.worldBoundaryColor;
         this.ctx.lineWidth = 2;
         this.ctx.strokeRect(0, 0, GAME_CONFIG.world.width, GAME_CONFIG.world.height);
+    }
+
+    drawFallingLeaves() {
+        this.ctx.save();
+        
+        this.game.fallingLeaves.forEach(leaf => {
+            // Only draw leaves that are in viewport
+            if (leaf.x >= this.game.camera.x - 20 && 
+                leaf.x <= this.game.camera.x + this.game.canvas.width + 20 &&
+                leaf.y >= this.game.camera.y - 20 && 
+                leaf.y <= this.game.camera.y + this.game.canvas.height + 20) {
+                
+                this.ctx.save();
+                this.ctx.globalAlpha = leaf.alpha;
+                this.ctx.translate(leaf.x, leaf.y);
+                this.ctx.rotate(leaf.rotation);
+                
+                this.ctx.fillStyle = leaf.color;
+                
+                if (leaf.leafType === 'pointed') {
+                    // Draw pointed leaf
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, -leaf.size);
+                    this.ctx.quadraticCurveTo(-leaf.size/2, -leaf.size/3, -leaf.size/3, leaf.size/2);
+                    this.ctx.quadraticCurveTo(0, leaf.size, leaf.size/3, leaf.size/2);
+                    this.ctx.quadraticCurveTo(leaf.size/2, -leaf.size/3, 0, -leaf.size);
+                    this.ctx.fill();
+                } else {
+                    // Draw oval leaf
+                    this.ctx.beginPath();
+                    this.ctx.ellipse(0, 0, leaf.size, leaf.size * 1.5, 0, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // Add subtle leaf vein
+                this.ctx.strokeStyle = this.darkenColor(leaf.color, 20);
+                this.ctx.lineWidth = 0.5;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, -leaf.size);
+                this.ctx.lineTo(0, leaf.size);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+        });
+        
+        this.ctx.restore();
     }
 
     drawGrid() {
@@ -316,6 +364,496 @@ export class RenderSystem {
                 }
             }
         }
+    }
+
+    drawTrees() {
+        if (!this.game.trees) return;
+        
+        this.game.trees.forEach(tree => {
+            if (tree.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                this.drawTree(tree);
+            }
+        });
+    }
+
+    drawTree(tree) {
+        const currentTheme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
+        const treeConfig = currentTheme.trees[tree.type];
+        
+        if (!treeConfig) return;
+
+        const x = tree.x;
+        const y = tree.y;
+        const width = tree.width;
+        const height = tree.height;
+        const trunkHeight = Math.floor(height * 0.4);
+        const crownHeight = height - trunkHeight;
+        const trunkWidth = Math.floor(width * 0.3);
+
+        this.ctx.save();
+
+        // Draw shadow
+        this.ctx.fillStyle = treeConfig.shadowColor;
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.fillRect(x - width/2 + 2, y + height/2 + 2, width, 4);
+        this.ctx.globalAlpha = 1;
+
+        // Draw trunk with texture
+        this.ctx.fillStyle = treeConfig.trunkColor;
+        const trunkX = x - trunkWidth/2;
+        const trunkY = y + crownHeight/2 - 2;
+        this.ctx.fillRect(trunkX, trunkY, trunkWidth, trunkHeight);
+
+        // Add bark texture
+        this.ctx.fillStyle = this.darkenColor(treeConfig.trunkColor, 20);
+        let barkSeed = x * 41 + y * 43 + width * 47;
+        for (let i = 0; i < trunkHeight; i += 8) {
+            for (let j = 0; j < trunkWidth; j += 6) {
+                barkSeed = (barkSeed * 9301 + 49297) % 233280;
+                const barkRand = barkSeed / 233280;
+                if (barkRand > 0.7) {
+                    this.ctx.fillRect(trunkX + j, trunkY + i, 2, 4);
+                }
+            }
+        }
+
+        // Draw trunk highlights and grooves
+        this.ctx.fillStyle = this.lightenColor(treeConfig.trunkColor, 25);
+        this.ctx.fillRect(trunkX, trunkY, 3, trunkHeight);
+        
+        // Add vertical bark lines
+        this.ctx.strokeStyle = this.darkenColor(treeConfig.trunkColor, 30);
+        this.ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+            const lineX = trunkX + (i + 1) * (trunkWidth / 4);
+            this.ctx.beginPath();
+            this.ctx.moveTo(lineX, trunkY);
+            this.ctx.lineTo(lineX, trunkY + trunkHeight);
+            this.ctx.stroke();
+        }
+
+        // Draw crown based on shape
+        this.ctx.fillStyle = treeConfig.topColor;
+        
+        if (treeConfig.crownShape === 'circle') {
+            this.drawTreeCrown_Circle(x, y - trunkHeight/2, width, crownHeight, treeConfig);
+        } else if (treeConfig.crownShape === 'triangle') {
+            this.drawTreeCrown_Triangle(x, y - trunkHeight/2, width, crownHeight, treeConfig);
+        } else if (treeConfig.crownShape === 'oval') {
+            this.drawTreeCrown_Oval(x, y - trunkHeight/2, width, crownHeight, treeConfig);
+        } else if (treeConfig.crownShape === 'square') {
+            this.drawTreeCrown_Square(x, y - trunkHeight/2, width, crownHeight, treeConfig);
+        } else if (treeConfig.crownShape === 'snowman') {
+            this.drawSnowman(x, y, width, height, treeConfig);
+        }
+
+        // Add snow caps for winter trees
+        if (treeConfig.snowCaps) {
+            this.drawSnowCaps(x, y - trunkHeight/2, width, crownHeight, treeConfig);
+        }
+        
+        // Add winter frosting effect for better visibility in winter theme
+        if (GAME_CONFIG.themes.current === 'winter' && !treeConfig.isSnowman) {
+            this.addWinterFrosting(tree, x, y - trunkHeight/2, width, crownHeight, treeConfig);
+        }
+
+        this.ctx.restore();
+    }
+
+    drawTreeCrown_Circle(x, y, width, height, config) {
+        // Draw main crown with cloud-like texture
+        this.ctx.fillStyle = config.topColor;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, width/2, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Add cloud-like bumps around the crown
+        const cloudBumps = 8;
+        this.ctx.fillStyle = this.lightenColor(config.topColor, 10);
+        for (let i = 0; i < cloudBumps; i++) {
+            const angle = (i / cloudBumps) * Math.PI * 2;
+            const bumpX = x + Math.cos(angle) * (width/3);
+            const bumpY = y + Math.sin(angle) * (height/3);
+            // Use deterministic size variation based on tree position and bump index
+            const seedVariation = (x * 13 + y * 17 + i * 23) % 1000 / 1000;
+            const bumpSize = width/6 + Math.sin(i * 1.7 + seedVariation) * 8;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(bumpX, bumpY, bumpSize, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        // Add individual leaves scattered around
+        this.drawLeaves(x, y, width, height, config);
+        
+        // Add highlights
+        this.ctx.fillStyle = this.lightenColor(config.topColor, 25);
+        this.ctx.beginPath();
+        this.ctx.arc(x - width/6, y - height/6, width/4, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Add some darker depth areas
+        this.ctx.fillStyle = this.darkenColor(config.topColor, 15);
+        this.ctx.beginPath();
+        this.ctx.arc(x + width/8, y + height/8, width/6, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawTreeCrown_Triangle(x, y, width, height, config) {
+        // Draw main triangular crown
+        this.ctx.fillStyle = config.topColor;
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y - height/2);
+        this.ctx.lineTo(x - width/2, y + height/2);
+        this.ctx.lineTo(x + width/2, y + height/2);
+        this.ctx.closePath();
+        this.ctx.fill();
+        
+        // Add layered needle-like sections for pine trees
+        const layers = 4;
+        for (let i = 0; i < layers; i++) {
+            const layerY = y - height/2 + (i * height/layers);
+            const layerWidth = width * (1 - i/layers);
+            const needleColor = i % 2 === 0 ? config.topColor : this.darkenColor(config.topColor, 10);
+            
+            this.ctx.fillStyle = needleColor;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, layerY);
+            this.ctx.lineTo(x - layerWidth/2, layerY + height/layers + 5);
+            this.ctx.lineTo(x + layerWidth/2, layerY + height/layers + 5);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        // Add pine needles around the edges
+        this.drawPineNeedles(x, y, width, height, config);
+        
+        // Add highlights
+        this.ctx.fillStyle = this.lightenColor(config.topColor, 20);
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y - height/2);
+        this.ctx.lineTo(x - width/6, y - height/4);
+        this.ctx.lineTo(x + width/6, y - height/4);
+        this.ctx.closePath();
+        this.ctx.fill();
+    }
+
+    drawTreeCrown_Oval(x, y, width, height, config) {
+        // Draw main oval crown
+        this.ctx.fillStyle = config.topColor;
+        this.ctx.beginPath();
+        this.ctx.ellipse(x, y, width/2, height/2, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Add organic cloud-like bumps
+        const bumps = 6;
+        this.ctx.fillStyle = this.lightenColor(config.topColor, 8);
+        for (let i = 0; i < bumps; i++) {
+            const angle = (i / bumps) * Math.PI * 2;
+            const bumpX = x + Math.cos(angle) * (width/3);
+            const bumpY = y + Math.sin(angle) * (height/4);
+            // Use deterministic variations
+            const seed1 = (x * 11 + y * 19 + i * 29) % 1000 / 1000;
+            const seed2 = (x * 7 + y * 23 + i * 31) % 1000 / 1000;
+            const bumpWidth = width/8 + Math.sin(i * 2.3 + seed1) * 5;
+            const bumpHeight = height/8 + Math.cos(i * 1.8 + seed2) * 4;
+            
+            this.ctx.beginPath();
+            this.ctx.ellipse(bumpX, bumpY, bumpWidth, bumpHeight, angle, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+        
+        // Add leaves
+        this.drawLeaves(x, y, width, height, config);
+        
+        // Add highlights
+        this.ctx.fillStyle = this.lightenColor(config.topColor, 20);
+        this.ctx.beginPath();
+        this.ctx.ellipse(x - width/8, y - height/8, width/3, height/4, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawLeaves(x, y, width, height, config) {
+        // Draw individual leaves scattered around the crown
+        const leafCount = Math.floor(width/8); // More leaves for bigger trees
+        this.ctx.save();
+        
+        // Use tree position as seed for consistent leaf placement
+        let seed = x * 73 + y * 37 + width * 17;
+        
+        for (let i = 0; i < leafCount; i++) {
+            // Generate deterministic "random" values based on seed
+            seed = (seed * 9301 + 49297) % 233280;
+            const rand1 = seed / 233280;
+            seed = (seed * 9301 + 49297) % 233280;
+            const rand2 = seed / 233280;
+            seed = (seed * 9301 + 49297) % 233280;
+            const rand3 = seed / 233280;
+            seed = (seed * 9301 + 49297) % 233280;
+            const rand4 = seed / 233280;
+            
+            const leafX = x + (rand1 - 0.5) * width * 0.8;
+            const leafY = y + (rand2 - 0.5) * height * 0.8;
+            const leafSize = 3 + rand3 * 4;
+            const colorVariation = (rand4 - 0.5) * 30;
+            const leafColor = this.varyColorDeterministic(config.topColor, colorVariation);
+            
+            this.ctx.fillStyle = leafColor;
+            this.ctx.save();
+            this.ctx.translate(leafX, leafY);
+            this.ctx.rotate(rand1 * Math.PI * 2);
+            
+            // Draw leaf shape
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, 0, leafSize, leafSize/2, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+            
+            this.ctx.restore();
+        }
+        
+        this.ctx.restore();
+    }
+
+    drawPineNeedles(x, y, width, height, config) {
+        // Draw small needle clusters around pine tree edges
+        const needleGroups = Math.floor(width/6);
+        this.ctx.save();
+        
+        // Use tree position as seed for consistent needle placement
+        let seed = x * 59 + y * 41 + width * 13;
+        
+        for (let i = 0; i < needleGroups; i++) {
+            const angle = (i / needleGroups) * Math.PI * 2;
+            const needleX = x + Math.cos(angle) * (width/2.5);
+            const needleY = y + Math.sin(angle) * (height/2.5);
+            
+            this.ctx.strokeStyle = this.darkenColor(config.topColor, 20);
+            this.ctx.lineWidth = 1;
+            
+            // Draw small needle lines with deterministic randomness
+            for (let j = 0; j < 5; j++) {
+                seed = (seed * 9301 + 49297) % 233280;
+                const rand1 = seed / 233280;
+                seed = (seed * 9301 + 49297) % 233280;
+                const rand2 = seed / 233280;
+                
+                const needleAngle = angle + (rand1 - 0.5) * 0.5;
+                const needleLength = 6 + rand2 * 4;
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(needleX, needleY);
+                this.ctx.lineTo(
+                    needleX + Math.cos(needleAngle) * needleLength,
+                    needleY + Math.sin(needleAngle) * needleLength
+                );
+                this.ctx.stroke();
+            }
+        }
+        
+        this.ctx.restore();
+    }
+
+    drawTreeCrown_Square(x, y, width, height, config) {
+        this.ctx.fillRect(x - width/2, y - height/2, width, height);
+        
+        // Add highlights
+        this.ctx.fillStyle = this.lightenColor(config.topColor, 15);
+        this.ctx.fillRect(x - width/2, y - height/2, width/3, height);
+    }
+
+    drawSnowman(x, y, width, height, config) {
+        // Draw three stacked circles for snowman
+        const bottomRadius = width/3;
+        const middleRadius = width/4;
+        const topRadius = width/5;
+        
+        this.ctx.fillStyle = config.trunkColor; // White
+        
+        // Bottom circle
+        this.ctx.beginPath();
+        this.ctx.arc(x, y + height/3, bottomRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Middle circle
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, middleRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Top circle (head)
+        this.ctx.beginPath();
+        this.ctx.arc(x, y - height/3, topRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Add simple face
+        this.ctx.fillStyle = '#000000';
+        this.ctx.beginPath();
+        this.ctx.arc(x - topRadius/3, y - height/3 - 2, 1, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.beginPath();
+        this.ctx.arc(x + topRadius/3, y - height/3 - 2, 1, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawSnowCaps(x, y, width, height, config) {
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.globalAlpha = 0.8;
+        
+        // Simple snow cap on top
+        if (config.crownShape === 'circle') {
+            this.ctx.beginPath();
+            this.ctx.arc(x, y - height/2, width/3, 0, Math.PI);
+            this.ctx.fill();
+        } else if (config.crownShape === 'triangle') {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y - height/2);
+            this.ctx.lineTo(x - width/4, y - height/4);
+            this.ctx.lineTo(x + width/4, y - height/4);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
+        
+        this.ctx.globalAlpha = 1;
+    }
+    
+    addWinterFrosting(tree, x, y, width, height, treeConfig) {
+        // Add white frosting highlights to make trees stand out in winter
+        this.ctx.save();
+        
+        if (treeConfig.crownShape === 'triangle') {
+            // Add bright snow highlights on triangle edges
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 3;
+            this.ctx.globalAlpha = 0.9;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x - width/2 + 5, y + height - 8);
+            this.ctx.lineTo(x, y + 8);
+            this.ctx.lineTo(x + width/2 - 5, y + height - 8);
+            this.ctx.stroke();
+            
+            // Add contrast outline
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 1;
+            this.ctx.globalAlpha = 0.7;
+            this.ctx.beginPath();
+            this.ctx.moveTo(x - width/2, y + height);
+            this.ctx.lineTo(x, y);
+            this.ctx.lineTo(x + width/2, y + height);
+            this.ctx.closePath();
+            this.ctx.stroke();
+        } else if (treeConfig.crownShape === 'circle' || treeConfig.crownShape === 'oval') {
+            // Add bright snow patches and outline
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 1;
+            this.ctx.globalAlpha = 0.6;
+            this.ctx.beginPath();
+            if (treeConfig.crownShape === 'circle') {
+                this.ctx.arc(x, y + height/2, width/2, 0, Math.PI * 2);
+            } else {
+                this.ctx.ellipse(x, y + height/2, width/2, height/2, 0, 0, Math.PI * 2);
+            }
+            this.ctx.stroke();
+            
+            // Add bright snow highlights
+            this.ctx.fillStyle = '#FFFFFF';
+            this.ctx.globalAlpha = 0.8;
+            const numHighlights = 4;
+            for (let i = 0; i < numHighlights; i++) {
+                const angle = (i / numHighlights) * Math.PI * 2;
+                const highlightX = x + Math.cos(angle) * width * 0.25;
+                const highlightY = y + height/2 + Math.sin(angle) * height * 0.25;
+                
+                this.ctx.beginPath();
+                this.ctx.arc(highlightX, highlightY, 6, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        }
+        
+        this.ctx.restore();
+    }
+
+    lightenColor(color, percent) {
+        // Simple color lightening function
+        const num = parseInt(color.replace("#",""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) + amt;
+        const G = (num >> 8 & 0x00FF) + amt;
+        const B = (num & 0x0000FF) + amt;
+        return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
+    }
+
+    darkenColor(color, percent) {
+        // Simple color darkening function
+        const num = parseInt(color.replace("#",""), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = (num >> 16) - amt;
+        const G = (num >> 8 & 0x00FF) - amt;
+        const B = (num & 0x0000FF) - amt;
+        return "#" + (0x1000000 + (R>0?R:0)*0x10000 + (G>0?G:0)*0x100 + (B>0?B:0)).toString(16).slice(1);
+    }
+
+    varyColor(color, variance) {
+        // Add random variation to a color
+        const num = parseInt(color.replace("#",""), 16);
+        const R = Math.max(0, Math.min(255, (num >> 16) + (Math.random() - 0.5) * variance));
+        const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + (Math.random() - 0.5) * variance));
+        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + (Math.random() - 0.5) * variance));
+        return "#" + (0x1000000 + R*0x10000 + G*0x100 + B).toString(16).slice(1);
+    }
+
+    varyColorDeterministic(color, variance) {
+        // Add deterministic variation to a color (no random)
+        const num = parseInt(color.replace("#",""), 16);
+        const R = Math.max(0, Math.min(255, (num >> 16) + variance));
+        const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + variance));
+        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + variance));
+        return "#" + (0x1000000 + Math.floor(R)*0x10000 + Math.floor(G)*0x100 + Math.floor(B)).toString(16).slice(1);
+    }
+
+    drawFallingLeaves() {
+        this.ctx.save();
+        
+        this.game.fallingLeaves.forEach(leaf => {
+            // Only draw leaves that are in viewport
+            if (leaf.x >= this.game.camera.x - 20 && 
+                leaf.x <= this.game.camera.x + this.game.canvas.width + 20 &&
+                leaf.y >= this.game.camera.y - 20 && 
+                leaf.y <= this.game.camera.y + this.game.canvas.height + 20) {
+                
+                this.ctx.save();
+                this.ctx.globalAlpha = leaf.alpha;
+                this.ctx.translate(leaf.x, leaf.y);
+                this.ctx.rotate(leaf.rotation);
+                
+                this.ctx.fillStyle = leaf.color;
+                
+                if (leaf.leafType === 'pointed') {
+                    // Draw pointed leaf
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, -leaf.size);
+                    this.ctx.quadraticCurveTo(-leaf.size/2, -leaf.size/3, -leaf.size/3, leaf.size/2);
+                    this.ctx.quadraticCurveTo(0, leaf.size, leaf.size/3, leaf.size/2);
+                    this.ctx.quadraticCurveTo(leaf.size/2, -leaf.size/3, 0, -leaf.size);
+                    this.ctx.fill();
+                } else {
+                    // Draw oval leaf
+                    this.ctx.beginPath();
+                    this.ctx.ellipse(0, 0, leaf.size, leaf.size * 1.5, 0, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                
+                // Add subtle leaf vein
+                this.ctx.strokeStyle = this.darkenColor(leaf.color, 20);
+                this.ctx.lineWidth = 0.5;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, -leaf.size);
+                this.ctx.lineTo(0, leaf.size);
+                this.ctx.stroke();
+                
+                this.ctx.restore();
+            }
+        });
+        
+        this.ctx.restore();
     }
 
     drawItems() {
@@ -742,6 +1280,49 @@ export class RenderSystem {
         }
         
         this.ctx.restore();
+    }
+
+    drawEntitiesWithZOrder() {
+        // Create array of all entities (players and trees) with their y-positions for z-ordering
+        const entities = [];
+        
+        // Add players
+        this.game.players.forEach(player => {
+            if (player && player.x !== undefined && player.y !== undefined) {
+                entities.push({
+                    type: 'player',
+                    entity: player,
+                    z: player.y + player.height // Use bottom of player for z-order
+                });
+            }
+        });
+        
+        // Add trees
+        this.game.trees.forEach(tree => {
+            if (tree && tree.isInViewport(this.game.camera.x, this.game.camera.y, this.game.canvas.width, this.game.canvas.height)) {
+                entities.push({
+                    type: 'tree',
+                    entity: tree,
+                    z: tree.y + tree.height/2 // Use middle of tree for z-order
+                });
+            }
+        });
+        
+        // Sort by z-position (back to front)
+        entities.sort((a, b) => a.z - b.z);
+        
+        // Draw entities in correct order
+        entities.forEach(item => {
+            if (item.type === 'player') {
+                this.drawPlayer(item.entity, item.entity.id === this.game.myId);
+                // Draw health bar after player
+                if (item.entity.isAlive) {
+                    this.drawHealthBar(item.entity);
+                }
+            } else if (item.type === 'tree') {
+                this.drawTree(item.entity);
+            }
+        });
     }
 
     drawPlayers() {

@@ -2,6 +2,7 @@ import { GAME_CONFIG } from './config/gameConfig.js';
 import { Player } from './entities/Player.js';
 import { Spell } from './entities/Spell.js';
 import { Wall } from './entities/Wall.js';
+import { Tree } from './entities/Tree.js';
 import { SpeedItem } from './entities/SpeedItem.js';
 import { ManaItem } from './entities/ManaItem.js';
 import { RingOfFireItem } from './entities/RingOfFireItem.js';
@@ -45,8 +46,10 @@ export class Game {
         this.players = new Map();
         this.spells = new Map();
         this.walls = new Map();
+        this.trees = new Map();
         this.items = new Map();
         this.explosions = []; // Array to store active explosions
+        this.fallingLeaves = []; // Array to store falling leaf particles
         this.myId = null;
         this.isDead = false;
         this.isDestroyed = false;
@@ -276,6 +279,7 @@ export class Game {
         this.updateCamera();
         this.updateSpells(deltaTime);
         this.updateExplosions(deltaTime);
+        this.updateFallingLeaves(deltaTime);
         
         // Update UI with current player stats
         this.ui.updatePlayerStats();
@@ -425,12 +429,42 @@ export class Game {
         });
     }
 
+    addTree(treeData) {
+        const tree = Tree.fromJSON(treeData);
+        this.trees.set(tree.id, tree);
+    }
+
+    setTrees(treesData) {
+        this.trees.clear();
+        Object.values(treesData).forEach(treeData => {
+            this.addTree(treeData);
+        });
+    }
+
+    checkTreeCollision(x, y, radius = 0) {
+        for (const [id, tree] of this.trees) {
+            if (tree.isCollidingWith({x, y}, radius)) {
+                return tree;
+            }
+        }
+        return null;
+    }
+
     checkWallCollision(x, y, radius = 0) {
+        // Check walls
         for (const [id, wall] of this.walls) {
             if (wall.collidesWith(x, y, radius)) {
                 return wall;
             }
         }
+        
+        // Check trees
+        for (const [id, tree] of this.trees) {
+            if (tree.isCollidingWith({x, y}, radius)) {
+                return tree;
+            }
+        }
+        
         return null;
     }
 
@@ -548,6 +582,82 @@ export class Game {
                 this.explosions.splice(i, 1);
             }
         }
+    }
+
+    updateFallingLeaves(deltaTime) {
+        const currentTime = Date.now();
+        
+        // Generate new leaves periodically around trees
+        if (currentTime - (this.lastLeafSpawn || 0) > 500) { // Every 500ms
+            this.lastLeafSpawn = currentTime;
+            
+            this.trees.forEach(tree => {
+                if (tree.isInViewport(this.camera.x, this.camera.y, this.canvas.width, this.canvas.height)) {
+                    // Spawn a new leaf with small probability
+                    if (Math.random() < 0.3) {
+                        this.spawnFallingLeaf(tree);
+                    }
+                }
+            });
+        }
+        
+        // Update existing leaves
+        for (let i = this.fallingLeaves.length - 1; i >= 0; i--) {
+            const leaf = this.fallingLeaves[i];
+            
+            // Update leaf physics
+            leaf.y += leaf.fallSpeed * (deltaTime / 1000);
+            leaf.x += Math.sin(leaf.y * 0.01 + leaf.swayOffset) * leaf.swayAmount;
+            leaf.rotation += leaf.rotationSpeed * (deltaTime / 1000);
+            leaf.age += deltaTime;
+            
+            // Fade out over time
+            leaf.alpha = Math.max(0, 1 - (leaf.age / leaf.lifetime));
+            
+            // Remove old leaves
+            if (leaf.age > leaf.lifetime || leaf.y > this.camera.y + this.canvas.height + 100) {
+                this.fallingLeaves.splice(i, 1);
+            }
+        }
+    }
+    
+    spawnFallingLeaf(tree) {
+        const currentTheme = GAME_CONFIG.themes[GAME_CONFIG.themes.current];
+        const treeConfig = currentTheme.trees[tree.type];
+        
+        if (!treeConfig || treeConfig.crownShape === 'snowman') return; // No leaves for snowmen
+        
+        const leaf = {
+            x: tree.x + (Math.random() - 0.5) * tree.width,
+            y: tree.y - tree.height/2 + Math.random() * tree.height/3,
+            size: 3 + Math.random() * 4,
+            color: this.varyLeafColor(treeConfig.topColor),
+            fallSpeed: 30 + Math.random() * 20, // pixels per second
+            swayAmount: 0.5 + Math.random() * 1.5,
+            swayOffset: Math.random() * Math.PI * 2,
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: (Math.random() - 0.5) * 4, // radians per second
+            alpha: 1,
+            age: 0,
+            lifetime: 3000 + Math.random() * 2000, // 3-5 seconds
+            leafType: Math.random() > 0.5 ? 'oval' : 'pointed'
+        };
+        
+        this.fallingLeaves.push(leaf);
+    }
+    
+    varyLeafColor(baseColor) {
+        // Create autumn-like color variations
+        const colors = [
+            baseColor, // Original green
+            '#FF6B35', // Orange
+            '#F7931E', // Yellow-orange
+            '#FFD23F', // Yellow
+            '#8B4513', // Brown
+            '#CD853F'  // Sandy brown
+        ];
+        
+        return colors[Math.floor(Math.random() * colors.length)];
     }
 
     // Start network connection with player name

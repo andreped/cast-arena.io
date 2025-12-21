@@ -42,6 +42,10 @@ class SocketManager {
         const wallData = this.gameState.getWallState();
         socket.emit('wallData', wallData);
         
+        // Send tree data to client for rendering
+        const treeData = this.gameState.getTreeState();
+        socket.emit('treeData', treeData);
+        
         // Send theme configuration to client
         socket.emit('themeConfig', { theme: gameConfig.theme.current });
         

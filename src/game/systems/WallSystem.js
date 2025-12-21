@@ -1,13 +1,16 @@
 const Wall = require('../entities/Wall');
+const Tree = require('../entities/Tree');
 const gameConfig = require('../../config/gameConfig');
 
 class WallSystem {
     constructor() {
         this.walls = new Map();
+        this.trees = new Map();
         this.wallThickness = 30; // Increased from 20
         this.minDistanceFromSpawn = 150; // Increased spawn protection area
         this.seed = 12345; // Fixed seed for consistent wall layout across restarts
         this.generateWalls();
+        this.generateTrees();
     }
 
     // Seeded random number generator
@@ -486,6 +489,88 @@ class WallSystem {
         const dx = Math.max(rx - px, 0, px - (rx + rw));
         const dy = Math.max(ry - py, 0, py - (ry + rh));
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    generateTrees() {
+        const { world } = gameConfig;
+        const themeConfig = gameConfig.theme;
+        
+        // Define tree types based on current theme (server-side)
+        let treeTypes = ['oak', 'pine', 'birch']; // Default for woods theme
+        
+        if (themeConfig.current === 'fortress') {
+            treeTypes = ['stonePillar', 'ancientColumn', 'weatheredPillar'];
+        } else if (themeConfig.current === 'winter') {
+            treeTypes = ['snowyPine', 'frostedOak', 'icyBirch', 'snowman'];
+        }
+
+        // Generate scattered trees in open areas
+        const treeCount = 25; // Number of trees to generate
+        let attempts = 0;
+        let treesPlaced = 0;
+
+        while (treesPlaced < treeCount && attempts < 100) {
+            attempts++;
+
+            const x = 100 + this.seededRandom() * (world.width - 200);
+            const y = 100 + this.seededRandom() * (world.height - 200);
+
+            // Check if position is valid (not too close to walls or spawn areas)
+            if (this.isValidTreePosition(x, y)) {
+                const treeType = treeTypes[Math.floor(this.seededRandom() * treeTypes.length)];
+                const tree = new Tree(x, y, treeType);
+                this.trees.set(tree.id, tree);
+                treesPlaced++;
+            }
+        }
+
+        console.log(`Generated ${treesPlaced} trees for theme: ${themeConfig.current}`);
+    }
+
+    isValidTreePosition(x, y) {
+        const treeRadius = 25; // Collision check radius
+        const minSpacing = 60; // Minimum distance between trees
+        
+        // Check distance from spawn areas (corners and center)
+        const spawnAreas = [
+            {x: 100, y: 100}, // Top-left spawn area
+            {x: gameConfig.world.width - 100, y: 100}, // Top-right
+            {x: gameConfig.world.width - 100, y: gameConfig.world.height - 100}, // Bottom-right
+            {x: 100, y: gameConfig.world.height - 100}, // Bottom-left
+            {x: gameConfig.world.width / 2, y: gameConfig.world.height / 2} // Center
+        ];
+
+        for (const spawn of spawnAreas) {
+            const distance = Math.sqrt((x - spawn.x) ** 2 + (y - spawn.y) ** 2);
+            if (distance < this.minDistanceFromSpawn) {
+                return false;
+            }
+        }
+
+        // Check distance from existing walls
+        for (const wall of this.walls.values()) {
+            if (this.distanceToRectangle(x, y, wall.x, wall.y, wall.width, wall.height) < 50) {
+                return false;
+            }
+        }
+
+        // Check distance from existing trees
+        for (const tree of this.trees.values()) {
+            const distance = Math.sqrt((x - tree.x) ** 2 + (y - tree.y) ** 2);
+            if (distance < minSpacing) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    getTreesState() {
+        const treesData = {};
+        this.trees.forEach(tree => {
+            treesData[tree.id] = tree.toJSON();
+        });
+        return treesData;
     }
 }
 
