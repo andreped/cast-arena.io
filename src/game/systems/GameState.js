@@ -103,6 +103,10 @@ class GameState {
         return this.wallSystem.getAllWalls();
     }
 
+    getTreeState() {
+        return this.wallSystem.getTreesState();
+    }
+
     checkWallCollision(x, y, radius = 0) {
         return this.wallSystem.checkCollision(x, y, radius);
     }

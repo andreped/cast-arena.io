@@ -77,6 +77,32 @@ export const GAME_CONFIG = {
                     shadowColor: '#2A2A2A'
                 }
             },
+            trees: {
+                stonePillar: {
+                    trunkColor: '#5A5A5A',
+                    topColor: '#708090',
+                    shadowColor: '#3A3A3A',
+                    crownShape: 'square',
+                    height: 90,
+                    width: 70
+                },
+                ancientColumn: {
+                    trunkColor: '#696969',
+                    topColor: '#8FBC8F',
+                    shadowColor: '#2F2F2F',
+                    crownShape: 'circle',
+                    height: 100,
+                    width: 76
+                },
+                weatheredPillar: {
+                    trunkColor: '#778899',
+                    topColor: '#9ACD32',
+                    shadowColor: '#2F4F4F',
+                    crownShape: 'oval',
+                    height: 84,
+                    width: 72
+                }
+            },
             floor: {
                 tileSize: 20,
                 patterns: {
@@ -130,6 +156,40 @@ export const GAME_CONFIG = {
                     baseColor: '#3D2914',
                     edgeColor: '#4A2C17',
                     shadowColor: '#2A1B0F'
+                }
+            },
+            trees: {
+                oak: {
+                    trunkColor: '#8B4513',
+                    topColor: '#228B22',
+                    shadowColor: '#654321',
+                    crownShape: 'circle',
+                    height: 96,
+                    width: 80
+                },
+                pine: {
+                    trunkColor: '#A0522D',
+                    topColor: '#006400',
+                    shadowColor: '#4A2C17',
+                    crownShape: 'triangle',
+                    height: 104,
+                    width: 76
+                },
+                birch: {
+                    trunkColor: '#F5F5DC',
+                    topColor: '#32CD32',
+                    shadowColor: '#D3D3D3',
+                    crownShape: 'oval',
+                    height: 92,
+                    width: 72
+                },
+                darkOak: {
+                    trunkColor: '#654321',
+                    topColor: '#2F4F2F',
+                    shadowColor: '#4A2C17',
+                    crownShape: 'circle',
+                    height: 100,
+                    width: 84
                 }
             },
             floor: {
@@ -189,7 +249,45 @@ export const GAME_CONFIG = {
                 perimeter: {
                     baseColor: '#1C3A5C',
                     edgeColor: '#2C4A6C',
-                    shadowColor: '#0C2A4C'
+                    shadowColor: '#1C3A5C'
+                }
+            },
+            trees: {
+                snowyPine: {
+                    trunkColor: '#2D1B0F',
+                    topColor: '#1B4D3E',
+                    shadowColor: '#1A0F08',
+                    crownShape: 'triangle',
+                    height: 100,
+                    width: 76,
+                    snowCaps: true
+                },
+                frostedOak: {
+                    trunkColor: '#3D2817',
+                    topColor: '#2F4F4F',
+                    shadowColor: '#2A1D10',
+                    crownShape: 'circle',
+                    height: 92,
+                    width: 80,
+                    snowCaps: true
+                },
+                snowman: {
+                    trunkColor: '#E0E0E0',
+                    topColor: '#F0F0F0',
+                    shadowColor: '#C0C0C0',
+                    crownShape: 'snowman',
+                    height: 96,
+                    width: 72,
+                    isSnowman: true
+                },
+                icyBirch: {
+                    trunkColor: '#4A4A4A',
+                    topColor: '#2F5F2F',
+                    shadowColor: '#3A3A3A',
+                    crownShape: 'oval',
+                    height: 88,
+                    width: 68,
+                    snowCaps: true
                 }
             },
             floor: {
